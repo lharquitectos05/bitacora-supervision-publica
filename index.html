@@ -4,118 +4,375 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Reporte de supervisión</title>
+
   <style>
-    :root { --ink:#17211d; --muted:#66736d; --green:#174c3c; --orange:#e87824; --paper:#fff; --bg:#f2f5f3; --danger:#a92f2f; }
+    :root {
+      --ink:#17211d;
+      --muted:#66736d;
+      --green:#174c3c;
+      --orange:#e87824;
+      --paper:#fff;
+      --bg:#f2f5f3;
+      --danger:#a92f2f;
+    }
+
     * { box-sizing:border-box; }
-    body { margin:0; font-family:Arial,sans-serif; color:var(--ink); background:var(--bg); }
-    main { max-width:680px; margin:auto; padding:20px 16px 48px; }
-    .card { background:var(--paper); border-radius:18px; padding:22px; box-shadow:0 8px 30px rgba(23,76,60,.10); }
-    h1 { margin:0 0 6px; font-size:26px; }
-    .lead { margin:0 0 22px; color:var(--muted); line-height:1.45; }
-    label { display:block; margin:16px 0 7px; font-weight:700; }
-    input,textarea,button { width:100%; font:inherit; }
-    input,textarea { border:1px solid #cdd6d1; border-radius:11px; padding:13px; background:white; }
-    textarea { min-height:90px; resize:vertical; }
-    button { border:0; border-radius:12px; padding:14px 16px; font-weight:700; cursor:pointer; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-    .record { background:var(--green); color:white; margin-top:8px; }
-    .record.active { background:var(--danger); }
-    .submit { background:var(--orange); color:white; margin-top:22px; }
-    .secondary { background:#e8eeeb; color:var(--ink); margin-top:8px; }
-    .timer { text-align:center; font-size:26px; font-variant-numeric:tabular-nums; margin:14px 0 4px; }
-    .hint,.status { color:var(--muted); font-size:14px; line-height:1.4; }
-    .status { padding:12px; margin-top:16px; border-radius:10px; background:#eef4f1; display:none; }
-    .status.error { display:block; color:#8b2222; background:#fdeeee; }
-    .status.ok { display:block; color:#15513c; background:#e8f6ef; }
-    .status.busy { display:block; color:#67410c; background:#fff4dc; }
-    .photo-list { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
-    .photo-list img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; }
-    iframe { display:none; }
-    @media (max-width:480px) { .card{padding:18px;} h1{font-size:23px;} }
+
+    body {
+      margin:0;
+      font-family:Arial,sans-serif;
+      color:var(--ink);
+      background:var(--bg);
+    }
+
+    main {
+      max-width:680px;
+      margin:auto;
+      padding:20px 16px 48px;
+    }
+
+    .card {
+      background:var(--paper);
+      border-radius:18px;
+      padding:22px;
+      box-shadow:0 8px 30px rgba(23,76,60,.10);
+    }
+
+    h1 {
+      margin:0 0 6px;
+      font-size:26px;
+    }
+
+    .lead {
+      margin:0 0 22px;
+      color:var(--muted);
+      line-height:1.45;
+    }
+
+    label {
+      display:block;
+      margin:16px 0 7px;
+      font-weight:700;
+    }
+
+    input, select, textarea, button {
+      width:100%;
+      font:inherit;
+    }
+
+    input, select, textarea {
+      border:1px solid #cdd6d1;
+      border-radius:11px;
+      padding:13px;
+      background:white;
+    }
+
+    textarea {
+      min-height:90px;
+      resize:vertical;
+    }
+
+    button {
+      border:0;
+      border-radius:12px;
+      padding:14px 16px;
+      font-weight:700;
+      cursor:pointer;
+    }
+
+    button:disabled {
+      opacity:.5;
+      cursor:not-allowed;
+    }
+
+    .record {
+      background:var(--green);
+      color:white;
+      margin-top:8px;
+    }
+
+    .record.active {
+      background:var(--danger);
+    }
+
+    .submit {
+      background:var(--orange);
+      color:white;
+      margin-top:22px;
+    }
+
+    .secondary {
+      background:#e8eeeb;
+      color:var(--ink);
+      margin-top:8px;
+    }
+
+    .timer {
+      text-align:center;
+      font-size:26px;
+      font-variant-numeric:tabular-nums;
+      margin:14px 0 4px;
+    }
+
+    .hint, .status {
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.4;
+    }
+
+    .status {
+      padding:12px;
+      margin-top:16px;
+      border-radius:10px;
+      background:#eef4f1;
+      display:none;
+    }
+
+    .status.error {
+      display:block;
+      color:#8b2222;
+      background:#fdeeee;
+    }
+
+    .status.ok {
+      display:block;
+      color:#15513c;
+      background:#e8f6ef;
+    }
+
+    .status.busy {
+      display:block;
+      color:#67410c;
+      background:#fff4dc;
+    }
+
+    .photo-list {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+      margin-top:10px;
+    }
+
+    .photo-list img {
+      width:100%;
+      aspect-ratio:1;
+      object-fit:cover;
+      border-radius:8px;
+    }
+
+    iframe {
+      display:none;
+    }
+
+    @media (max-width:480px) {
+      .card { padding:18px; }
+      h1 { font-size:23px; }
+    }
   </style>
 </head>
+
 <body>
 <main>
   <section class="card">
+
     <h1>Reporte de supervisión</h1>
-    <p class="lead">Graba un audio explicando la visita y adjunta las fotografías necesarias.</p>
+
+    <p class="lead">
+      Graba un audio explicando la visita y adjunta las fotografías necesarias.
+    </p>
 
     <label for="accessCode">Código de acceso</label>
     <input id="accessCode" type="password" autocomplete="off" required>
 
     <label for="project">Proyecto</label>
-    <input id="project" list="projectList" placeholder="Escribe o selecciona el proyecto" required>
-    <datalist id="projectList"><option value="Proyecto de prueba"></datalist>
+    <select id="project" required>
+      <option value="">Selecciona un proyecto</option>
+      <option value="Proyecto de prueba">Proyecto de prueba</option>
+    </select>
 
     <label>Audio de la visita</label>
-    <button id="recordButton" class="record" type="button">Iniciar grabación</button>
+
+    <button id="recordButton" class="record" type="button">
+      Iniciar grabación
+    </button>
+
     <div id="timer" class="timer">00:00</div>
-    <audio id="preview" controls hidden style="width:100%;margin-top:10px"></audio>
-    <button id="discardButton" class="secondary" type="button" hidden>Descartar audio</button>
-    <p class="hint">Menciona trabajos observados, problemas, correcciones, responsables, fechas y seguimiento anterior.</p>
-    <input id="audioFallback" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.webm" hidden>
-    <button id="fallbackButton" class="secondary" type="button">O adjuntar un audio existente</button>
+
+    <audio
+      id="preview"
+      controls
+      hidden
+      style="width:100%;margin-top:10px">
+    </audio>
+
+    <button id="discardButton" class="secondary" type="button" hidden>
+      Descartar audio
+    </button>
+
+    <p class="hint">
+      Menciona trabajos observados, problemas, correcciones,
+      responsables, fechas y seguimiento anterior.
+    </p>
+
+    <input
+      id="audioFallback"
+      type="file"
+      accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.webm"
+      hidden>
+
+    <button id="fallbackButton" class="secondary" type="button">
+      O adjuntar un audio existente
+    </button>
 
     <label for="photos">Fotografías</label>
-    <input id="photos" type="file" accept="image/*" multiple>
+
+    <input
+      id="photos"
+      type="file"
+      accept="image/*"
+      multiple>
+
     <div id="photoList" class="photo-list"></div>
-    <p class="hint">Máximo 6 fotografías. Puedes usar cámara o galería.</p>
+
+    <p class="hint">
+      Máximo 6 fotografías. Puedes usar cámara o galería.
+    </p>
 
     <label for="note">Nota adicional (opcional)</label>
-    <textarea id="note" placeholder="Por ejemplo: dar prioridad al baño principal."></textarea>
 
-    <button id="submitButton" class="submit" type="button">Enviar y crear bitácora</button>
+    <textarea
+      id="note"
+      placeholder="Por ejemplo: dar prioridad al baño principal.">
+    </textarea>
+
+    <button id="submitButton" class="submit" type="button">
+      Enviar y crear bitácora
+    </button>
+
     <div id="status" class="status"></div>
+
   </section>
 </main>
+
 <iframe name="resultFrame" id="resultFrame"></iframe>
+
 <script>
-  const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbx7BOM4l0iO9ZvjGhAT3Hx61Mk9GvrGSLwplx3yJTNtTs4BI1xQZIub9cLdf-ubOjoN/exec';
+  const BACKEND_URL =
+    'https://script.google.com/macros/s/AKfycbx7BOM4l0iO9ZvjGhAT3Hx61Mk9GvrGSLwplx3yJTNtTs4BI1xQZIub9cLdf-ubOjoN/exec';
+
   const MAX_AUDIO_MINUTES = 8;
   const MAX_IMAGES = 6;
-  const state = { recorder:null, stream:null, chunks:[], audioBlob:null, audioMime:'', startedAt:0, timer:null, photos:[] };
+
+  const state = {
+    recorder:null,
+    stream:null,
+    chunks:[],
+    audioBlob:null,
+    audioMime:'',
+    startedAt:0,
+    timer:null,
+    photos:[]
+  };
+
   const $ = id => document.getElementById(id);
 
   $('recordButton').addEventListener('click', async () => {
-    if (state.recorder && state.recorder.state === 'recording') return stopRecording();
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      return showError('Este navegador no permite grabar directamente. Usa la opción de adjuntar audio.');
+    if (state.recorder && state.recorder.state === 'recording') {
+      return stopRecording();
     }
+
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      return showError(
+        'Este navegador no permite grabar directamente. Usa la opción de adjuntar audio.'
+      );
+    }
+
     try {
-      state.stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-      const preferred = ['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus'];
-      state.audioMime = preferred.find(t => MediaRecorder.isTypeSupported(t)) || '';
+      state.stream = await navigator.mediaDevices.getUserMedia({
+        audio:true
+      });
+
+      const preferred = [
+        'audio/mp4',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus'
+      ];
+
+      state.audioMime =
+        preferred.find(type => MediaRecorder.isTypeSupported(type)) || '';
+
       state.chunks = [];
-      state.recorder = new MediaRecorder(state.stream, state.audioMime ? { mimeType:state.audioMime } : undefined);
-      state.recorder.ondataavailable = e => { if (e.data.size) state.chunks.push(e.data); };
+
+      state.recorder = new MediaRecorder(
+        state.stream,
+        state.audioMime ? { mimeType:state.audioMime } : undefined
+      );
+
+      state.recorder.ondataavailable = event => {
+        if (event.data.size) {
+          state.chunks.push(event.data);
+        }
+      };
+
       state.recorder.onstop = finishRecording;
       state.recorder.start(1000);
       state.startedAt = Date.now();
+
       state.timer = setInterval(updateTimer, 250);
+
       $('recordButton').textContent = 'Detener grabación';
       $('recordButton').classList.add('active');
+
       showStatus('Grabando…', 'busy');
-      setTimeout(() => { if (state.recorder?.state === 'recording') stopRecording(); }, MAX_AUDIO_MINUTES * 60000);
+
+      setTimeout(() => {
+        if (state.recorder?.state === 'recording') {
+          stopRecording();
+        }
+      }, MAX_AUDIO_MINUTES * 60000);
+
     } catch (error) {
-      showError('No fue posible usar el micrófono. Revisa el permiso del navegador. Detalle: ' + (error.message || error));
+      showError(
+        'No fue posible usar el micrófono. Revisa el permiso del navegador. Detalle: ' +
+        (error.message || error)
+      );
     }
   });
 
-  function stopRecording() { if (state.recorder?.state === 'recording') state.recorder.stop(); }
+  function stopRecording() {
+    if (state.recorder?.state === 'recording') {
+      state.recorder.stop();
+    }
+  }
+
   function finishRecording() {
     clearInterval(state.timer);
-    state.stream?.getTracks().forEach(t => t.stop());
-    state.audioMime = state.recorder.mimeType || state.audioMime || 'audio/webm';
-    state.audioBlob = new Blob(state.chunks, { type:state.audioMime });
+
+    state.stream?.getTracks().forEach(track => track.stop());
+
+    state.audioMime =
+      state.recorder.mimeType ||
+      state.audioMime ||
+      'audio/webm';
+
+    state.audioBlob = new Blob(
+      state.chunks,
+      { type:state.audioMime }
+    );
+
     $('preview').src = URL.createObjectURL(state.audioBlob);
     $('preview').hidden = false;
     $('discardButton').hidden = false;
+
     $('recordButton').textContent = 'Grabar nuevamente';
     $('recordButton').classList.remove('active');
+
     showStatus('Audio listo para enviar.', 'ok');
   }
 
   $('discardButton').addEventListener('click', resetAudio);
+
   function resetAudio() {
     state.audioBlob = null;
     $('preview').hidden = true;
@@ -123,77 +380,230 @@
     $('timer').textContent = '00:00';
   }
 
-  $('fallbackButton').addEventListener('click', () => $('audioFallback').click());
-  $('audioFallback').addEventListener('change', e => {
-    const file = e.target.files[0];
+  $('fallbackButton').addEventListener('click', () => {
+    $('audioFallback').click();
+  });
+
+  $('audioFallback').addEventListener('change', event => {
+    const file = event.target.files[0];
+
     if (!file) return;
+
     state.audioBlob = file;
     state.audioMime = file.type || 'audio/mpeg';
+
     $('preview').src = URL.createObjectURL(file);
     $('preview').hidden = false;
     $('discardButton').hidden = false;
+
     showStatus('Audio adjunto listo.', 'ok');
   });
 
-  $('photos').addEventListener('change', async e => {
-    const files = Array.from(e.target.files).slice(0, MAX_IMAGES);
+  $('photos').addEventListener('change', async event => {
+    const files = Array.from(event.target.files).slice(0, MAX_IMAGES);
+
     state.photos = [];
     $('photoList').innerHTML = '';
+
     for (const file of files) {
-      const blob = await compressImage(file, 1600, .78);
+      const blob = await compressImage(file, 1600, 0.78);
+
       state.photos.push(blob);
-      const img = document.createElement('img');
-      img.src = URL.createObjectURL(blob);
-      $('photoList').appendChild(img);
+
+      const image = document.createElement('img');
+      image.src = URL.createObjectURL(blob);
+
+      $('photoList').appendChild(image);
     }
   });
 
   $('submitButton').addEventListener('click', async () => {
-    if (!$('accessCode').value.trim()) return showError('Ingresa el código de acceso.');
-    if (!$('project').value.trim()) return showError('Indica el proyecto.');
-    if (!state.audioBlob) return showError('Graba o adjunta un audio.');
+    if (!$('accessCode').value.trim()) {
+      return showError('Ingresa el código de acceso.');
+    }
+
+    if (!$('project').value.trim()) {
+      return showError('Selecciona el proyecto.');
+    }
+
+    if (!state.audioBlob) {
+      return showError('Graba o adjunta un audio.');
+    }
+
     setBusy(true);
+
     try {
       const images = [];
-      for (const blob of state.photos) images.push({ dataUrl:await blobToDataUrl(blob), mimeType:blob.type, caption:'' });
+
+      for (const blob of state.photos) {
+        images.push({
+          dataUrl:await blobToDataUrl(blob),
+          mimeType:blob.type,
+          caption:''
+        });
+      }
+
       const payload = {
-        accessCode:$('accessCode').value.trim(), project:$('project').value.trim(), note:$('note').value.trim(),
-        audio:{ dataUrl:await blobToDataUrl(state.audioBlob), mimeType:state.audioMime || state.audioBlob.type || 'audio/webm' }, images
+        accessCode:$('accessCode').value.trim(),
+        project:$('project').value.trim(),
+        note:$('note').value.trim(),
+
+        audio:{
+          dataUrl:await blobToDataUrl(state.audioBlob),
+          mimeType:
+            state.audioMime ||
+            state.audioBlob.type ||
+            'audio/webm'
+        },
+
+        images:images
       };
+
       submitToBackend(JSON.stringify(payload));
-    } catch (error) { setBusy(false); showError(error); }
+
+    } catch (error) {
+      setBusy(false);
+      showError(error);
+    }
   });
 
   function submitToBackend(payload) {
     const form = document.createElement('form');
-    form.method = 'POST'; form.action = BACKEND_URL; form.target = 'resultFrame'; form.style.display = 'none';
+
+    form.method = 'POST';
+    form.action = BACKEND_URL;
+    form.target = 'resultFrame';
+    form.style.display = 'none';
+
     const input = document.createElement('textarea');
-    input.name = 'payload'; input.value = payload;
-    form.appendChild(input); document.body.appendChild(form); form.submit(); form.remove();
+    input.name = 'payload';
+    input.value = payload;
+
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    form.submit();
+    form.remove();
   }
 
   window.addEventListener('message', event => {
     const data = event.data || {};
+
     if (data.type !== 'bitacora-result') return;
+
     setBusy(false);
-    if (!data.ok) return showError(data.message || 'No se pudo crear la bitácora.');
-    showStatus('Reporte creado correctamente. Ya puedes cerrar esta página.', 'ok');
-    resetAudio(); state.photos = []; $('photoList').innerHTML = ''; $('photos').value = ''; $('note').value = '';
+
+    if (!data.ok) {
+      return showError(
+        data.message || 'No se pudo crear la bitácora.'
+      );
+    }
+
+    showStatus(
+      'Reporte creado correctamente. Ya puedes cerrar esta página.',
+      'ok'
+    );
+
+    resetAudio();
+
+    state.photos = [];
+    $('photoList').innerHTML = '';
+    $('photos').value = '';
+    $('note').value = '';
   });
 
   function setBusy(busy) {
-    $('submitButton').disabled = busy; $('recordButton').disabled = busy;
-    if (busy) showStatus('Procesando audio y creando la bitácora. Puede tardar uno o dos minutos…', 'busy');
+    $('submitButton').disabled = busy;
+    $('recordButton').disabled = busy;
+
+    if (busy) {
+      showStatus(
+        'Procesando audio y creando la bitácora. Puede tardar uno o dos minutos…',
+        'busy'
+      );
+    }
   }
+
   function updateTimer() {
-    const s = Math.floor((Date.now()-state.startedAt)/1000);
-    $('timer').textContent = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+    const seconds =
+      Math.floor((Date.now() - state.startedAt) / 1000);
+
+    const minutesText =
+      String(Math.floor(seconds / 60)).padStart(2, '0');
+
+    const secondsText =
+      String(seconds % 60).padStart(2, '0');
+
+    $('timer').textContent =
+      minutesText + ':' + secondsText;
   }
-  function showStatus(message,type) { $('status').textContent=String(message||''); $('status').className='status '+type; }
-  function showError(error) { showStatus(error?.message || error || 'Ocurrió un error.','error'); }
-  function blobToDataUrl(blob) { return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsDataURL(blob); }); }
-  function compressImage(file,maxDimension,quality) {
-    return new Promise((resolve,reject)=>{ const img=new Image(); img.onload=()=>{ let {width,height}=img; const scale=Math.min(1,maxDimension/Math.max(width,height)); width=Math.round(width*scale); height=Math.round(height*scale); const c=document.createElement('canvas'); c.width=width;c.height=height;c.getContext('2d').drawImage(img,0,0,width,height); c.toBlob(b=>b?resolve(b):reject(new Error('No se pudo procesar una fotografía.')),'image/jpeg',quality); }; img.onerror=reject; img.src=URL.createObjectURL(file); });
+
+  function showStatus(message, type) {
+    $('status').textContent = String(message || '');
+    $('status').className = 'status ' + type;
+  }
+
+  function showError(error) {
+    showStatus(
+      error?.message || error || 'Ocurrió un error.',
+      'error'
+    );
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function compressImage(file, maxDimension, quality) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+
+      image.onload = () => {
+        let width = image.width;
+        let height = image.height;
+
+        const scale = Math.min(
+          1,
+          maxDimension / Math.max(width, height)
+        );
+
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+
+        const canvas = document.createElement('canvas');
+
+        canvas.width = width;
+        canvas.height = height;
+
+        canvas
+          .getContext('2d')
+          .drawImage(image, 0, 0, width, height);
+
+        canvas.toBlob(
+          blob => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(
+                new Error('No se pudo procesar una fotografía.')
+              );
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+
+      image.onerror = reject;
+      image.src = URL.createObjectURL(file);
+    });
   }
 </script>
 </body>
