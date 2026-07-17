@@ -1,198 +1,182 @@
+
+
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Reporte de supervisión</title>
 
   <style>
     :root {
-      --ink: #17211d;
-      --muted: #66736d;
-      --green: #174c3c;
-      --orange: #e87824;
-      --paper: #ffffff;
-      --bg: #f2f5f3;
-      --danger: #a92f2f;
+      --ink:#263238;
+      --muted:#607d8b;
+      --dark:#315b6b;
+      --mid:#b8ddea;
+      --light:#dceff7;
+      --paper:#ffffff;
+      --bg:#f6fafc;
+      --danger:#a92f2f;
+      --border:#c9dce4;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing:border-box; }
 
     body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      color: var(--ink);
-      background: var(--bg);
+      margin:0;
+      font-family:Arial,sans-serif;
+      color:var(--ink);
+      background:var(--bg);
     }
 
     main {
-      max-width: 680px;
-      margin: auto;
-      padding: 20px 16px 48px;
+      max-width:680px;
+      margin:auto;
+      padding:20px 16px 48px;
     }
 
     .card {
-      padding: 22px;
-      background: var(--paper);
-      border-radius: 18px;
-      box-shadow: 0 8px 30px rgba(23, 76, 60, 0.10);
+      background:var(--paper);
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:22px;
+      box-shadow:0 8px 30px rgba(49,91,107,.10);
     }
 
     h1 {
-      margin: 0 0 6px;
-      font-size: 26px;
+      margin:0 0 6px;
+      color:var(--dark);
+      font-size:26px;
     }
 
     .lead {
-      margin: 0 0 22px;
-      color: var(--muted);
-      line-height: 1.45;
+      margin:0 0 22px;
+      color:var(--muted);
+      line-height:1.45;
     }
 
     label {
-      display: block;
-      margin: 16px 0 7px;
-      font-weight: 700;
+      display:block;
+      margin:16px 0 7px;
+      font-weight:700;
     }
 
-    input,
-    select,
-    textarea,
-    button {
-      width: 100%;
-      font: inherit;
+    input, select, textarea, button {
+      width:100%;
+      font:inherit;
     }
 
-    input,
-    select,
-    textarea {
-      padding: 13px;
-      background: white;
-      border: 1px solid #cdd6d1;
-      border-radius: 11px;
+    input, select, textarea {
+      border:1px solid var(--border);
+      border-radius:11px;
+      padding:13px;
+      background:white;
     }
 
     textarea {
-      min-height: 90px;
-      resize: vertical;
+      min-height:90px;
+      resize:vertical;
     }
 
     button {
-      padding: 14px 16px;
-      border: 0;
-      border-radius: 12px;
-      font-weight: 700;
-      cursor: pointer;
+      border:0;
+      border-radius:12px;
+      padding:14px 16px;
+      font-weight:700;
+      cursor:pointer;
     }
 
     button:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
+      opacity:.5;
+      cursor:not-allowed;
     }
 
     .record {
-      margin-top: 8px;
-      color: white;
-      background: var(--green);
+      background:var(--dark);
+      color:white;
+      margin-top:8px;
     }
 
     .record.active {
-      background: var(--danger);
+      background:var(--danger);
     }
 
     .submit {
-      margin-top: 22px;
-      color: white;
-      background: var(--orange);
+      background:var(--mid);
+      color:var(--ink);
+      margin-top:22px;
     }
 
     .secondary {
-      margin-top: 8px;
-      color: var(--ink);
-      background: #e8eeeb;
+      background:var(--light);
+      color:var(--ink);
+      margin-top:8px;
     }
 
     .timer {
-      margin: 14px 0 4px;
-      font-size: 26px;
-      text-align: center;
-      font-variant-numeric: tabular-nums;
+      text-align:center;
+      font-size:26px;
+      font-variant-numeric:tabular-nums;
+      margin:14px 0 4px;
     }
 
-    .hint,
-    .status {
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.4;
+    .hint, .status {
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.4;
     }
 
     .status {
-      display: none;
-      margin-top: 16px;
-      padding: 12px;
-      background: #eef4f1;
-      border-radius: 10px;
+      padding:12px;
+      margin-top:16px;
+      border-radius:10px;
+      display:none;
     }
 
     .status.error {
-      display: block;
-      color: #8b2222;
-      background: #fdeeee;
+      display:block;
+      color:#8b2222;
+      background:#fdeeee;
     }
 
     .status.ok {
-      display: block;
-      color: #15513c;
-      background: #e8f6ef;
+      display:block;
+      color:#15513c;
+      background:#e8f6ef;
     }
 
     .status.busy {
-      display: block;
-      color: #67410c;
-      background: #fff4dc;
+      display:block;
+      color:var(--dark);
+      background:var(--light);
     }
 
     .photo-list {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-top: 10px;
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+      margin-top:10px;
     }
 
     .photo-list img {
-      width: 100%;
-      aspect-ratio: 1;
-      object-fit: cover;
-      border-radius: 8px;
+      width:100%;
+      aspect-ratio:1;
+      object-fit:cover;
+      border-radius:8px;
     }
 
-    iframe {
-      display: none;
-    }
+    iframe { display:none; }
 
-    @media (max-width: 480px) {
-      .card {
-        padding: 18px;
-      }
-
-      h1 {
-        font-size: 23px;
-      }
+    @media (max-width:480px) {
+      .card { padding:18px; }
+      h1 { font-size:23px; }
     }
   </style>
 </head>
 
 <body>
-
 <main>
   <section class="card">
-
     <h1>Reporte de supervisión</h1>
 
     <p class="lead">
@@ -200,50 +184,30 @@
     </p>
 
     <label for="accessCode">Código de acceso</label>
-
-    <input
-      id="accessCode"
-      type="password"
-      inputmode="numeric"
-      autocomplete="off"
-      required>
+    <input id="accessCode" type="password" inputmode="numeric" autocomplete="off" required>
 
     <label for="project">Proyecto</label>
-
     <select id="project" required>
-      <option value="">Selecciona un proyecto</option>
-      <option value="Proyecto de prueba">Proyecto de prueba</option>
+      <option value="">Cargando proyectos…</option>
     </select>
 
     <label>Audio de la visita</label>
 
-    <button
-      id="recordButton"
-      class="record"
-      type="button">
+    <button id="recordButton" class="record" type="button">
       Iniciar grabación
     </button>
 
     <div id="timer" class="timer">00:00</div>
 
-    <audio
-      id="preview"
-      controls
-      hidden
-      style="width:100%; margin-top:10px;">
-    </audio>
+    <audio id="preview" controls hidden style="width:100%;margin-top:10px"></audio>
 
-    <button
-      id="discardButton"
-      class="secondary"
-      type="button"
-      hidden>
+    <button id="discardButton" class="secondary" type="button" hidden>
       Descartar audio
     </button>
 
     <p class="hint">
-      Menciona trabajos observados, problemas, correcciones,
-      responsables, fechas y seguimiento anterior.
+      Menciona trabajos observados, problemas, correcciones, responsables,
+      fechas y seguimiento anterior.
     </p>
 
     <input
@@ -252,20 +216,13 @@
       accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.webm"
       hidden>
 
-    <button
-      id="fallbackButton"
-      class="secondary"
-      type="button">
+    <button id="fallbackButton" class="secondary" type="button">
       O adjuntar un audio existente
     </button>
 
     <label for="photos">Fotografías</label>
 
-    <input
-      id="photos"
-      type="file"
-      accept="image/*"
-      multiple>
+    <input id="photos" type="file" accept="image/*" multiple>
 
     <div id="photoList" class="photo-list"></div>
 
@@ -277,26 +234,17 @@
 
     <textarea
       id="note"
-      placeholder="Por ejemplo: dar prioridad al baño principal.">
-    </textarea>
+      placeholder="Por ejemplo: dar prioridad al baño principal."></textarea>
 
-    <button
-      id="submitButton"
-      class="submit"
-      type="button">
-      Enviar y crear bitácora
+    <button id="submitButton" class="submit" type="button">
+      Enviar y agregar a bitácora
     </button>
 
     <div id="status" class="status"></div>
-
   </section>
 </main>
 
-<iframe
-  id="resultFrame"
-  name="resultFrame"
-  title="Respuesta del servidor">
-</iframe>
+<iframe id="resultFrame" name="resultFrame" title="Respuesta del servidor"></iframe>
 
 <script>
   const BACKEND_URL =
@@ -308,33 +256,65 @@
   const RESPONSE_TIMEOUT_MS = 3 * 60 * 1000;
 
   const state = {
-    recorder: null,
-    stream: null,
-    chunks: [],
-    audioBlob: null,
-    audioMime: '',
-    startedAt: 0,
-    timer: null,
-    photos: [],
-    submitForm: null,
-    responseTimeout: null
+    recorder:null,
+    stream:null,
+    chunks:[],
+    audioBlob:null,
+    audioMime:'',
+    startedAt:0,
+    timer:null,
+    photos:[],
+    submitForm:null,
+    responseTimeout:null
   };
 
   const $ = id => document.getElementById(id);
 
+  window.receiveBitacoraConfig = function(config) {
+    const projects = Array.isArray(config && config.projects)
+      ? config.projects
+      : [];
+
+    $('project').innerHTML =
+      '<option value="">Selecciona un proyecto</option>' +
+      projects.map(project => {
+        const name = typeof project === 'string'
+          ? project
+          : String(project.name || '');
+
+        return '<option value="' + escapeHtml(name) + '">' +
+          escapeHtml(name) +
+          '</option>';
+      }).join('');
+
+    if (!projects.length) {
+      showError('No hay proyectos activos disponibles.');
+    }
+  };
+
+  loadProjects();
+
+  function loadProjects() {
+    const script = document.createElement('script');
+    script.src =
+      BACKEND_URL +
+      '?page=config&callback=receiveBitacoraConfig&t=' +
+      Date.now();
+
+    script.onerror = () => {
+      showError('No se pudo cargar la lista de proyectos.');
+    };
+
+    document.head.appendChild(script);
+  }
+
   $('recordButton').addEventListener('click', async () => {
-    if (
-      state.recorder &&
-      state.recorder.state === 'recording'
-    ) {
+    if (state.recorder && state.recorder.state === 'recording') {
       stopRecording();
       return;
     }
 
-    if (
-      !navigator.mediaDevices?.getUserMedia ||
-      !window.MediaRecorder
-    ) {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       showError(
         'Este navegador no permite grabar directamente. ' +
         'Utiliza la opción de adjuntar un audio existente.'
@@ -343,10 +323,7 @@
     }
 
     try {
-      state.stream =
-        await navigator.mediaDevices.getUserMedia({
-          audio: true
-        });
+      state.stream = await navigator.mediaDevices.getUserMedia({ audio:true });
 
       const preferredTypes = [
         'audio/mp4',
@@ -356,17 +333,13 @@
       ];
 
       state.audioMime =
-        preferredTypes.find(type =>
-          MediaRecorder.isTypeSupported(type)
-        ) || '';
+        preferredTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
 
       state.chunks = [];
 
       state.recorder = new MediaRecorder(
         state.stream,
-        state.audioMime
-          ? { mimeType: state.audioMime }
-          : undefined
+        state.audioMime ? { mimeType:state.audioMime } : undefined
       );
 
       state.recorder.ondataavailable = event => {
@@ -376,114 +349,71 @@
       };
 
       state.recorder.onstop = finishRecording;
-
       state.recorder.start(1000);
       state.startedAt = Date.now();
 
       clearInterval(state.timer);
+      state.timer = setInterval(updateTimer, 250);
 
-      state.timer =
-        setInterval(updateTimer, 250);
-
-      $('recordButton').textContent =
-        'Detener grabación';
-
+      $('recordButton').textContent = 'Detener grabación';
       $('recordButton').classList.add('active');
 
       showStatus('Grabando…', 'busy');
 
       setTimeout(() => {
-        if (
-          state.recorder &&
-          state.recorder.state === 'recording'
-        ) {
+        if (state.recorder?.state === 'recording') {
           stopRecording();
         }
       }, MAX_AUDIO_MINUTES * 60 * 1000);
 
     } catch (error) {
       showError(
-        'No fue posible utilizar el micrófono. ' +
-        'Revisa el permiso del navegador. Detalle: ' +
+        'No fue posible utilizar el micrófono. Revisa el permiso del navegador. ' +
         getErrorMessage(error)
       );
     }
   });
 
   function stopRecording() {
-    if (
-      state.recorder &&
-      state.recorder.state === 'recording'
-    ) {
+    if (state.recorder?.state === 'recording') {
       state.recorder.stop();
     }
   }
 
   function finishRecording() {
     clearInterval(state.timer);
-
-    if (state.stream) {
-      state.stream
-        .getTracks()
-        .forEach(track => track.stop());
-    }
+    state.stream?.getTracks().forEach(track => track.stop());
 
     state.audioMime =
       state.recorder?.mimeType ||
       state.audioMime ||
       'audio/webm';
 
-    state.audioBlob = new Blob(
-      state.chunks,
-      { type: state.audioMime }
-    );
+    state.audioBlob = new Blob(state.chunks, { type:state.audioMime });
 
     if (!state.audioBlob.size) {
-      showError(
-        'La grabación quedó vacía. Intenta grabar nuevamente.'
-      );
+      showError('La grabación quedó vacía. Intenta nuevamente.');
       return;
     }
 
     if (state.audioBlob.size > MAX_AUDIO_BYTES) {
       resetAudio();
-
-      showError(
-        'El audio excede el límite de 15 MB. ' +
-        'Graba un audio más corto.'
-      );
-
+      showError('El audio excede el límite de 15 MB.');
       return;
     }
 
-    $('preview').src =
-      URL.createObjectURL(state.audioBlob);
-
+    $('preview').src = URL.createObjectURL(state.audioBlob);
     $('preview').hidden = false;
     $('discardButton').hidden = false;
-
-    $('recordButton').textContent =
-      'Grabar nuevamente';
-
+    $('recordButton').textContent = 'Grabar nuevamente';
     $('recordButton').classList.remove('active');
 
-    showStatus(
-      'Audio listo para enviar. Tamaño: ' +
-      formatBytes(state.audioBlob.size) + '.',
-      'ok'
-    );
+    showStatus('Audio listo para enviar.', 'ok');
   }
 
-  $('discardButton').addEventListener(
-    'click',
-    resetAudio
-  );
+  $('discardButton').addEventListener('click', resetAudio);
 
   function resetAudio() {
-    if ($('preview').src) {
-      URL.revokeObjectURL($('preview').src);
-    }
-
     state.audioBlob = null;
     state.audioMime = '';
     state.chunks = [];
@@ -491,222 +421,126 @@
     $('preview').removeAttribute('src');
     $('preview').load();
     $('preview').hidden = true;
-
     $('discardButton').hidden = true;
     $('audioFallback').value = '';
     $('timer').textContent = '00:00';
-
-    $('recordButton').textContent =
-      'Iniciar grabación';
-
+    $('recordButton').textContent = 'Iniciar grabación';
     $('recordButton').classList.remove('active');
   }
 
-  $('fallbackButton').addEventListener(
-    'click',
-    () => {
-      $('audioFallback').click();
+  $('fallbackButton').addEventListener('click', () => {
+    $('audioFallback').click();
+  });
+
+  $('audioFallback').addEventListener('change', event => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (file.size > MAX_AUDIO_BYTES) {
+      $('audioFallback').value = '';
+      showError('El audio excede el límite de 15 MB.');
+      return;
     }
-  );
 
-  $('audioFallback').addEventListener(
-    'change',
-    event => {
-      const file = event.target.files?.[0];
+    state.audioBlob = file;
+    state.audioMime = file.type || 'audio/mpeg';
 
-      if (!file) {
-        return;
+    $('preview').src = URL.createObjectURL(file);
+    $('preview').hidden = false;
+    $('discardButton').hidden = false;
+
+    showStatus('Audio adjunto listo.', 'ok');
+  });
+
+  $('photos').addEventListener('change', async event => {
+    try {
+      const files = Array.from(event.target.files || []).slice(0, MAX_IMAGES);
+
+      state.photos = [];
+      $('photoList').innerHTML = '';
+
+      for (const file of files) {
+        const blob = await compressImage(file, 1600, .78);
+        state.photos.push(blob);
+
+        const image = document.createElement('img');
+        image.src = URL.createObjectURL(blob);
+        image.alt = 'Fotografía seleccionada';
+        $('photoList').appendChild(image);
+      }
+    } catch (error) {
+      showError('No se pudieron procesar las fotografías. ' + getErrorMessage(error));
+    }
+  });
+
+  $('submitButton').addEventListener('click', async () => {
+    const accessCode = $('accessCode').value.trim();
+    const project = $('project').value.trim();
+
+    if (!accessCode) {
+      showError('Ingresa el código de acceso.');
+      return;
+    }
+
+    if (!project) {
+      showError('Selecciona el proyecto.');
+      return;
+    }
+
+    if (!state.audioBlob) {
+      showError('Graba o adjunta un audio.');
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      const images = [];
+
+      for (const blob of state.photos) {
+        images.push({
+          dataUrl:await blobToDataUrl(blob),
+          mimeType:blob.type || 'image/jpeg',
+          caption:''
+        });
       }
 
-      if (file.size > MAX_AUDIO_BYTES) {
-        $('audioFallback').value = '';
-
-        showError(
-          'El audio excede el límite de 15 MB. ' +
-          'Selecciona un archivo más pequeño.'
-        );
-
-        return;
-      }
-
-      state.audioBlob = file;
-
-      state.audioMime =
-        file.type ||
-        detectAudioMime(file.name) ||
-        'audio/mpeg';
-
-      $('preview').src =
-        URL.createObjectURL(file);
-
-      $('preview').hidden = false;
-      $('discardButton').hidden = false;
+      const payload = {
+        accessCode,
+        project,
+        note:$('note').value.trim(),
+        audio:{
+          dataUrl:await blobToDataUrl(state.audioBlob),
+          mimeType:state.audioMime || state.audioBlob.type || 'audio/webm'
+        },
+        images
+      };
 
       showStatus(
-        'Audio adjunto listo. Tamaño: ' +
-        formatBytes(file.size) + '.',
-        'ok'
+        'Audio enviado. Procesando la visita y actualizando la bitácora mensual…',
+        'busy'
       );
+
+      submitToBackend(payload);
+
+    } catch (error) {
+      setBusy(false);
+      showError(getErrorMessage(error));
     }
-  );
-
-  $('photos').addEventListener(
-    'change',
-    async event => {
-      try {
-        const selectedFiles =
-          Array.from(event.target.files || []);
-
-        if (selectedFiles.length > MAX_IMAGES) {
-          showStatus(
-            'Solo se utilizarán las primeras ' +
-            MAX_IMAGES + ' fotografías.',
-            'busy'
-          );
-        }
-
-        const files =
-          selectedFiles.slice(0, MAX_IMAGES);
-
-        state.photos = [];
-        $('photoList').innerHTML = '';
-
-        for (const file of files) {
-          const blob =
-            await compressImage(file, 1600, 0.78);
-
-          state.photos.push(blob);
-
-          const image =
-            document.createElement('img');
-
-          image.src =
-            URL.createObjectURL(blob);
-
-          image.alt = 'Fotografía seleccionada';
-
-          $('photoList').appendChild(image);
-        }
-
-      } catch (error) {
-        showError(
-          'No se pudieron procesar las fotografías. ' +
-          getErrorMessage(error)
-        );
-      }
-    }
-  );
-
-  $('submitButton').addEventListener(
-    'click',
-    async () => {
-      const accessCode =
-        $('accessCode').value.trim();
-
-      const project =
-        $('project').value.trim();
-
-      if (!accessCode) {
-        showError(
-          'Ingresa el código de acceso.'
-        );
-        return;
-      }
-
-      if (!project) {
-        showError(
-          'Selecciona el proyecto.'
-        );
-        return;
-      }
-
-      if (!state.audioBlob) {
-        showError(
-          'Graba o adjunta un audio.'
-        );
-        return;
-      }
-
-      if (state.audioBlob.size > MAX_AUDIO_BYTES) {
-        showError(
-          'El audio excede el límite de 15 MB.'
-        );
-        return;
-      }
-
-      setBusy(true);
-
-      try {
-        showStatus(
-          'Preparando el audio para enviarlo…',
-          'busy'
-        );
-
-        const images = [];
-
-        for (const blob of state.photos) {
-          images.push({
-            dataUrl: await blobToDataUrl(blob),
-            mimeType: blob.type || 'image/jpeg',
-            caption: ''
-          });
-        }
-
-        const audioDataUrl =
-          await blobToDataUrl(state.audioBlob);
-
-        const payload = {
-          accessCode,
-          project,
-          note: $('note').value.trim(),
-
-          audio: {
-            dataUrl: audioDataUrl,
-            mimeType:
-              state.audioMime ||
-              state.audioBlob.type ||
-              'audio/webm'
-          },
-
-          images
-        };
-
-        showStatus(
-          'Audio enviado. Procesando la transcripción ' +
-          'y creando la bitácora…',
-          'busy'
-        );
-
-        submitToBackend(payload);
-
-      } catch (error) {
-        setBusy(false);
-
-        showError(
-          'No se pudo preparar el envío. ' +
-          getErrorMessage(error)
-        );
-      }
-    }
-  );
+  });
 
   function submitToBackend(payload) {
     clearPendingSubmission();
 
-    const form =
-      document.createElement('form');
-
+    const form = document.createElement('form');
     form.method = 'POST';
     form.action = BACKEND_URL;
     form.target = 'resultFrame';
-    form.enctype =
-      'application/x-www-form-urlencoded';
-
+    form.enctype = 'application/x-www-form-urlencoded';
     form.style.display = 'none';
 
-    const input =
-      document.createElement('textarea');
-
+    const input = document.createElement('textarea');
     input.name = 'payload';
     input.value = JSON.stringify(payload);
 
@@ -715,70 +549,52 @@
 
     state.submitForm = form;
 
-    state.responseTimeout =
-      setTimeout(() => {
-        clearPendingSubmission();
-        setBusy(false);
+    state.responseTimeout = setTimeout(() => {
+      clearPendingSubmission();
+      setBusy(false);
 
-        showError(
-          'El servidor no respondió después de tres minutos. ' +
-          'Revisa Apps Script → Ejecuciones para confirmar ' +
-          'si el proceso se inició.'
-        );
-      }, RESPONSE_TIMEOUT_MS);
+      showError(
+        'El servidor no respondió después de tres minutos. ' +
+        'Revisa Apps Script → Ejecuciones.'
+      );
+    }, RESPONSE_TIMEOUT_MS);
 
     form.submit();
   }
 
-  window.addEventListener(
-    'message',
-    event => {
-      const resultFrame =
-        $('resultFrame');
+  window.addEventListener('message', event => {
+    const resultFrame = $('resultFrame');
 
-      if (
-        resultFrame.contentWindow &&
-        event.source !== resultFrame.contentWindow
-      ) {
-        return;
-      }
-
-      const data = event.data;
-
-      if (
-        !data ||
-        typeof data !== 'object' ||
-        data.type !== 'bitacora-result'
-      ) {
-        return;
-      }
-
-      clearPendingSubmission();
-      setBusy(false);
-
-      if (!data.ok) {
-        showError(
-          data.message ||
-          'Apps Script no pudo crear la bitácora.'
-        );
-
-        return;
-      }
-
-      showStatus(
-        'Bitácora creada correctamente' +
-        (
-          data.reportNumber
-            ? '. Número de reporte: ' +
-              data.reportNumber
-            : '.'
-        ),
-        'ok'
-      );
-
-      resetAfterSuccess();
+    if (
+      resultFrame.contentWindow &&
+      event.source !== resultFrame.contentWindow
+    ) {
+      return;
     }
-  );
+
+    const data = event.data;
+
+    if (!data || typeof data !== 'object' || data.type !== 'bitacora-result') {
+      return;
+    }
+
+    clearPendingSubmission();
+    setBusy(false);
+
+    if (!data.ok) {
+      showError(data.message || 'No se pudo registrar la visita.');
+      return;
+    }
+
+    showStatus(
+      'Visita N.º ' +
+      String(data.visitNumber || '') +
+      ' agregada correctamente a la bitácora mensual.',
+      'ok'
+    );
+
+    resetAfterSuccess();
+  });
 
   function clearPendingSubmission() {
     if (state.responseTimeout) {
@@ -794,9 +610,7 @@
 
   function resetAfterSuccess() {
     resetAudio();
-
     state.photos = [];
-
     $('photoList').innerHTML = '';
     $('photos').value = '';
     $('note').value = '';
@@ -810,218 +624,105 @@
     $('project').disabled = busy;
     $('accessCode').disabled = busy;
 
-    if (!busy) {
-      $('submitButton').textContent =
-        'Enviar y crear bitácora';
-
-      return;
-    }
-
-    $('submitButton').textContent =
-      'Procesando…';
+    $('submitButton').textContent = busy
+      ? 'Procesando…'
+      : 'Enviar y agregar a bitácora';
   }
 
   function updateTimer() {
-    const seconds =
-      Math.floor(
-        (Date.now() - state.startedAt) / 1000
-      );
-
-    const minutesText =
-      String(
-        Math.floor(seconds / 60)
-      ).padStart(2, '0');
-
-    const secondsText =
-      String(
-        seconds % 60
-      ).padStart(2, '0');
+    const seconds = Math.floor((Date.now() - state.startedAt) / 1000);
 
     $('timer').textContent =
-      minutesText + ':' + secondsText;
+      String(Math.floor(seconds / 60)).padStart(2, '0') +
+      ':' +
+      String(seconds % 60).padStart(2, '0');
   }
 
   function showStatus(message, type) {
-    $('status').textContent =
-      String(message || '');
-
-    $('status').className =
-      'status ' + type;
+    $('status').textContent = String(message || '');
+    $('status').className = 'status ' + type;
   }
 
   function showError(error) {
-    showStatus(
-      getErrorMessage(error),
-      'error'
-    );
+    showStatus(getErrorMessage(error), 'error');
   }
 
   function getErrorMessage(error) {
-    if (!error) {
-      return 'Ocurrió un error.';
-    }
-
-    if (typeof error === 'string') {
-      return error;
-    }
-
-    if (error.message) {
-      return error.message;
-    }
-
-    return String(error);
+    return error?.message || error || 'Ocurrió un error.';
   }
 
   function blobToDataUrl(blob) {
-    return new Promise(
-      (resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onload = () =>
-          resolve(reader.result);
-
-        reader.onerror = () =>
-          reject(
-            new Error(
-              'No se pudo leer el archivo.'
-            )
-          );
-
-        reader.readAsDataURL(blob);
-      }
-    );
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      reader.readAsDataURL(blob);
+    });
   }
 
-  function compressImage(
-    file,
-    maxDimension,
-    quality
-  ) {
-    return new Promise(
-      (resolve, reject) => {
-        const image = new Image();
-        const imageUrl =
-          URL.createObjectURL(file);
+  function compressImage(file, maxDimension, quality) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      const imageUrl = URL.createObjectURL(file);
 
-        image.onload = () => {
-          try {
-            let width = image.width;
-            let height = image.height;
+      image.onload = () => {
+        try {
+          let width = image.width;
+          let height = image.height;
 
-            const scale = Math.min(
-              1,
-              maxDimension /
-              Math.max(width, height)
-            );
+          const scale = Math.min(
+            1,
+            maxDimension / Math.max(width, height)
+          );
 
-            width =
-              Math.round(width * scale);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
 
-            height =
-              Math.round(height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
 
-            const canvas =
-              document.createElement('canvas');
+          canvas
+            .getContext('2d')
+            .drawImage(image, 0, 0, width, height);
 
-            canvas.width = width;
-            canvas.height = height;
-
-            const context =
-              canvas.getContext('2d');
-
-            if (!context) {
-              throw new Error(
-                'El navegador no pudo preparar la imagen.'
-              );
-            }
-
-            context.drawImage(
-              image,
-              0,
-              0,
-              width,
-              height
-            );
-
-            canvas.toBlob(
-              blob => {
-                URL.revokeObjectURL(imageUrl);
-
-                if (blob) {
-                  resolve(blob);
-                } else {
-                  reject(
-                    new Error(
-                      'No se pudo comprimir una fotografía.'
-                    )
-                  );
-                }
-              },
-              'image/jpeg',
-              quality
-            );
-
-          } catch (error) {
+          canvas.toBlob(blob => {
             URL.revokeObjectURL(imageUrl);
-            reject(error);
-          }
-        };
 
-        image.onerror = () => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('No se pudo comprimir una fotografía.'));
+            }
+          }, 'image/jpeg', quality);
+
+        } catch (error) {
           URL.revokeObjectURL(imageUrl);
+          reject(error);
+        }
+      };
 
-          reject(
-            new Error(
-              'Una fotografía no pudo abrirse.'
-            )
-          );
-        };
+      image.onerror = () => {
+        URL.revokeObjectURL(imageUrl);
+        reject(new Error('Una fotografía no pudo abrirse.'));
+      };
 
-        image.src = imageUrl;
-      }
+      image.src = imageUrl;
+    });
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(
+      /[&<>'"]/g,
+      character => ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        "'":'&#39;',
+        '"':'&quot;'
+      })[character]
     );
-  }
-
-  function detectAudioMime(filename) {
-    const extension =
-      String(filename || '')
-        .split('.')
-        .pop()
-        .toLowerCase();
-
-    const mimeTypes = {
-      m4a: 'audio/mp4',
-      mp4: 'audio/mp4',
-      mp3: 'audio/mpeg',
-      wav: 'audio/wav',
-      aac: 'audio/aac',
-      ogg: 'audio/ogg',
-      webm: 'audio/webm'
-    };
-
-    return mimeTypes[extension] || '';
-  }
-
-  function formatBytes(bytes) {
-    if (!Number.isFinite(bytes)) {
-      return '';
-    }
-
-    if (bytes < 1024) {
-      return bytes + ' bytes';
-    }
-
-    if (bytes < 1024 * 1024) {
-      return (
-        bytes / 1024
-      ).toFixed(1) + ' KB';
-    }
-
-    return (
-      bytes / (1024 * 1024)
-    ).toFixed(1) + ' MB';
   }
 </script>
-
 </body>
 </html>
