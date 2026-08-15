@@ -277,7 +277,7 @@
     <div id="photoList" class="photo-list"></div>
 
     <p class="hint">
-      Máximo 12 fotografías. Se enviarán automáticamente en lotes de 4 para mayor estabilidad. Puedes eliminar cualquier foto antes de enviar.
+      Máximo 12 fotografías. Se enviarán automáticamente en lotes de 4 y cada lote se verificará antes de continuar. Puedes eliminar cualquier foto antes de enviar.
     </p>
 
     <label for="note">Nota adicional (opcional)</label>
@@ -316,10 +316,10 @@
     photos:[],
     submitForm:null,
     responseTimeout:null,
-    pendingRequest:null,
     activeSubmissionId:'',
     uploadedBatchIndexes:new Set(),
-    lastPhotoSignature:''
+    lastPhotoSignature:'',
+    lastServerStatus:null
   };
 
   const $ = id => document.getElementById(id);
@@ -628,8 +628,6 @@
         .map(item => item.id + ':' + item.blob.size)
         .join('|');
 
-      // Si cambió la selección después de iniciar una carga fallida,
-      // se reinicia la sesión para evitar índices inconsistentes.
       if (
         state.activeSubmissionId &&
         state.lastPhotoSignature &&
@@ -641,13 +639,15 @@
 
       state.lastPhotoSignature = photoSignature;
 
-      // ETAPA 1: guardar audio y abrir sesión.
       if (!state.activeSubmissionId) {
+        state.activeSubmissionId = createSubmissionId_();
+
         showStatus('Paso 1 de 3 · Guardando audio…', 'busy');
 
-        const startResult = await sendPayload_({
+        postPayload_({
           action:'start',
           accessCode,
+          submissionId:state.activeSubmissionId,
           project,
           note:$('note').value.trim(),
           audio:{
@@ -656,15 +656,29 @@
           }
         });
 
-        state.activeSubmissionId = startResult.submissionId;
-        state.uploadedBatchIndexes = new Set();
+        await waitForServer_(
+          state.activeSubmissionId,
+          status => status.exists === true,
+          90000,
+          'No se confirmó el guardado del audio.'
+        );
       }
 
-      // ETAPA 2: subir fotografías en lotes de máximo 4.
       const batches = chunkPhotos_(state.photos, 4);
 
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
         if (state.uploadedBatchIndexes.has(batchIndex)) {
+          continue;
+        }
+
+        const before = await getSubmissionStatus_(state.activeSubmissionId);
+
+        if (
+          before.exists &&
+          Array.isArray(before.batches) &&
+          before.batches.includes(batchIndex)
+        ) {
+          state.uploadedBatchIndexes.add(batchIndex);
           continue;
         }
 
@@ -691,30 +705,52 @@
           });
         }
 
-        await sendPayloadWithRetry_({
+        postPayload_({
           action:'photo_batch',
           accessCode,
           submissionId:state.activeSubmissionId,
-          batchIndex:batchIndex,
+          batchIndex,
           startPhotoIndex:batchIndex * 4,
           totalBatches:batches.length,
-          images:images
-        }, 2);
+          images
+        });
+
+        await waitForServer_(
+          state.activeSubmissionId,
+          status =>
+            status.exists &&
+            Array.isArray(status.batches) &&
+            status.batches.includes(batchIndex),
+          90000,
+          'No se confirmó el lote ' + (batchIndex + 1) + '.'
+        );
 
         state.uploadedBatchIndexes.add(batchIndex);
       }
 
-      // ETAPA 3: IA + documento mensual, usando fotos ya seguras en Drive.
       showStatus(
         'Paso 3 de 3 · Organizando la visita y actualizando la bitácora mensual…',
         'busy'
       );
 
-      const finalResult = await sendPayload_({
-        action:'finalize',
-        accessCode,
-        submissionId:state.activeSubmissionId
-      });
+      const currentStatus = await getSubmissionStatus_(state.activeSubmissionId);
+
+      if (currentStatus.status !== 'completed') {
+        postPayload_({
+          action:'finalize',
+          accessCode,
+          submissionId:state.activeSubmissionId
+        });
+      }
+
+      const finalStatus = await waitForServer_(
+        state.activeSubmissionId,
+        status => status.exists && status.status === 'completed' && status.result,
+        240000,
+        'La visita sigue procesándose y todavía no confirmó la finalización.'
+      );
+
+      const finalResult = finalStatus.result || {};
 
       showStatus(
         'Visita N.º ' +
@@ -725,6 +761,7 @@
         'ok'
       );
 
+      setBusy(false);
       resetAfterSuccess();
 
     } catch (error) {
@@ -734,12 +771,21 @@
         getErrorMessage(error) +
         (
           state.activeSubmissionId
-            ? ' Puedes presionar nuevamente “Enviar y agregar a bitácora” para continuar desde el último lote completado.'
+            ? ' Puedes presionar nuevamente “Enviar y agregar a bitácora”; el sistema continuará desde lo ya guardado.'
             : ''
         )
       );
     }
   });
+
+
+  function createSubmissionId_() {
+    if (window.crypto && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+  }
 
 
   function chunkPhotos_(photos, size) {
@@ -753,130 +799,100 @@
   }
 
 
-  async function sendPayloadWithRetry_(payload, maxRetries) {
-    let lastError;
+  function postPayload_(payload) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = BACKEND_URL;
+    form.target = 'resultFrame';
+    form.enctype = 'application/x-www-form-urlencoded';
+    form.style.display = 'none';
 
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await sendPayload_(payload);
-      } catch (error) {
-        lastError = error;
+    const input = document.createElement('textarea');
+    input.name = 'payload';
+    input.value = JSON.stringify(payload);
 
-        if (attempt < maxRetries) {
-          showStatus(
-            'Reintentando lote ' +
-            (Number(payload.batchIndex) + 1) +
-            '…',
-            'busy'
-          );
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
 
-          await wait_(1200 * (attempt + 1));
+    setTimeout(() => {
+      try { form.remove(); } catch (_) {}
+    }, 5000);
+  }
+
+
+  function getSubmissionStatus_(submissionId) {
+    return new Promise((resolve, reject) => {
+      const callbackName =
+        '__bitacoraStatus_' +
+        Date.now() +
+        '_' +
+        Math.random().toString(36).slice(2);
+
+      const script = document.createElement('script');
+
+      const cleanup = () => {
+        try { delete window[callbackName]; } catch (_) {}
+        try { script.remove(); } catch (_) {}
+      };
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('No se pudo consultar el estado del servidor.'));
+      }, 15000);
+
+      window[callbackName] = result => {
+        clearTimeout(timeout);
+        cleanup();
+
+        if (!result || result.ok === false) {
+          reject(new Error(result?.message || 'Estado de servidor inválido.'));
+          return;
         }
-      }
+
+        state.lastServerStatus = result;
+        resolve(result);
+      };
+
+      script.src =
+        BACKEND_URL +
+        '?page=status' +
+        '&submissionId=' + encodeURIComponent(submissionId) +
+        '&callback=' + encodeURIComponent(callbackName) +
+        '&t=' + Date.now();
+
+      script.onerror = () => {
+        clearTimeout(timeout);
+        cleanup();
+        reject(new Error('No se pudo consultar el estado del servidor.'));
+      };
+
+      document.head.appendChild(script);
+    });
+  }
+
+
+  async function waitForServer_(submissionId, predicate, timeoutMs, timeoutMessage) {
+    const started = Date.now();
+
+    while (Date.now() - started < timeoutMs) {
+      try {
+        const status = await getSubmissionStatus_(submissionId);
+
+        if (predicate(status)) {
+          return status;
+        }
+      } catch (_) {}
+
+      await wait_(1800);
     }
 
-    throw lastError;
+    throw new Error(timeoutMessage);
   }
 
 
   function wait_(milliseconds) {
     return new Promise(resolve => setTimeout(resolve, milliseconds));
-  }
-
-
-  function sendPayload_(payload) {
-    clearPendingSubmission();
-
-    return new Promise((resolve, reject) => {
-      state.pendingRequest = { resolve, reject };
-
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = BACKEND_URL;
-      form.target = 'resultFrame';
-      form.enctype = 'application/x-www-form-urlencoded';
-      form.style.display = 'none';
-
-      const input = document.createElement('textarea');
-      input.name = 'payload';
-      input.value = JSON.stringify(payload);
-
-      form.appendChild(input);
-      document.body.appendChild(form);
-      state.submitForm = form;
-
-      state.responseTimeout = setTimeout(() => {
-        const pending = state.pendingRequest;
-
-        if (state.submitForm) {
-          state.submitForm.remove();
-          state.submitForm = null;
-        }
-
-        state.responseTimeout = null;
-        state.pendingRequest = null;
-
-        if (pending) {
-          pending.reject(
-            new Error(
-              'No se recibió confirmación del servidor dentro del tiempo previsto.'
-            )
-          );
-        }
-      }, RESPONSE_TIMEOUT_MS);
-
-      form.submit();
-    });
-  }
-
-
-  window.addEventListener('message', event => {
-    const data = event.data;
-
-    if (!data || typeof data !== 'object' || data.type !== 'bitacora-result') {
-      return;
-    }
-
-    const pending = state.pendingRequest;
-
-    if (state.responseTimeout) {
-      clearTimeout(state.responseTimeout);
-      state.responseTimeout = null;
-    }
-
-    if (state.submitForm) {
-      state.submitForm.remove();
-      state.submitForm = null;
-    }
-
-    state.pendingRequest = null;
-
-    if (!pending) {
-      return;
-    }
-
-    if (!data.ok) {
-      pending.reject(
-        new Error(data.message || 'No se pudo completar la operación.')
-      );
-      return;
-    }
-
-    pending.resolve(data);
-  });
-
-  function clearPendingSubmission() {
-    if (state.responseTimeout) {
-      clearTimeout(state.responseTimeout);
-      state.responseTimeout = null;
-    }
-
-    if (state.submitForm) {
-      state.submitForm.remove();
-      state.submitForm = null;
-    }
-
-    state.pendingRequest = null;
   }
 
   function resetAfterSuccess() {
