@@ -253,7 +253,7 @@
   const MAX_AUDIO_MINUTES = 8;
   const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
   const MAX_IMAGES = 12;
-  const RESPONSE_TIMEOUT_MS = 3 * 60 * 1000;
+  const RESPONSE_TIMEOUT_MS = 8 * 60 * 1000;
 
   const state = {
     recorder:null,
@@ -461,7 +461,7 @@
       $('photoList').innerHTML = '';
 
       for (const file of files) {
-        const blob = await compressImage(file, 1600, .78);
+        const blob = await compressImage(file, 1280, .72);
         state.photos.push(blob);
 
         const image = document.createElement('img');
@@ -517,8 +517,13 @@
         images
       };
 
+      const totalImageBytes = state.photos.reduce((sum, blob) => sum + blob.size, 0);
+      const totalImageMB = (totalImageBytes / (1024 * 1024)).toFixed(2);
+
       showStatus(
-        'Audio enviado. Procesando la visita y actualizando la bitácora mensual…',
+        'Enviando audio y ' + images.length + ' fotografía' +
+        (images.length === 1 ? '' : 's') +
+        ' (' + totalImageMB + ' MB). Procesando la visita y actualizando la bitácora mensual…',
         'busy'
       );
 
@@ -554,8 +559,9 @@
       setBusy(false);
 
       showError(
-        'El servidor no respondió después de tres minutos. ' +
-        'Revisa Apps Script → Ejecuciones.'
+        'La página no recibió la confirmación del servidor después de ocho minutos. ' +
+        'No vuelvas a enviar todavía: revisa primero la bitácora y Apps Script → Ejecuciones, ' +
+        'porque el servidor puede haber terminado correctamente.'
       );
     }, RESPONSE_TIMEOUT_MS);
 
@@ -563,15 +569,6 @@
   }
 
   window.addEventListener('message', event => {
-    const resultFrame = $('resultFrame');
-
-    if (
-      resultFrame.contentWindow &&
-      event.source !== resultFrame.contentWindow
-    ) {
-      return;
-    }
-
     const data = event.data;
 
     if (!data || typeof data !== 'object' || data.type !== 'bitacora-result') {
@@ -589,7 +586,8 @@
     showStatus(
       'Visita N.º ' +
       String(data.visitNumber || '') +
-      ' agregada correctamente a la bitácora mensual.',
+      ' agregada correctamente a la bitácora mensual. ' +
+      'Fotografías enviadas: ' + state.photos.length + '.',
       'ok'
     );
 
