@@ -158,11 +158,54 @@
       margin-top:10px;
     }
 
-    .photo-list img {
+    .photo-card {
+      position:relative;
+      overflow:hidden;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:var(--paper);
+    }
+
+    .photo-card img {
+      display:block;
       width:100%;
       aspect-ratio:1;
       object-fit:cover;
-      border-radius:8px;
+    }
+
+    .photo-remove {
+      position:absolute;
+      top:6px;
+      right:6px;
+      width:30px;
+      height:30px;
+      padding:0;
+      border-radius:999px;
+      color:white;
+      background:rgba(169,47,47,.92);
+      font-size:18px;
+      line-height:30px;
+    }
+
+    .photo-meta {
+      padding:7px 8px;
+      color:var(--muted);
+      font-size:12px;
+      text-align:center;
+    }
+
+    .photo-toolbar {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-top:10px;
+    }
+
+    .photo-toolbar .secondary {
+      width:auto;
+      margin-top:0;
+      padding:9px 12px;
     }
 
     iframe { display:none; }
@@ -224,10 +267,17 @@
 
     <input id="photos" type="file" accept="image/*" multiple>
 
+    <div class="photo-toolbar">
+      <span id="photoCount" class="hint">Fotos seleccionadas: 0 / 12</span>
+      <button id="clearPhotosButton" class="secondary" type="button" hidden>
+        Quitar todas
+      </button>
+    </div>
+
     <div id="photoList" class="photo-list"></div>
 
     <p class="hint">
-      Máximo 12 fotografías. Puedes usar cámara o galería.
+      Máximo 12 fotografías. Se enviarán automáticamente en lotes de 4 para mayor estabilidad. Puedes eliminar cualquier foto antes de enviar.
     </p>
 
     <label for="note">Nota adicional (opcional)</label>
@@ -265,7 +315,11 @@
     timer:null,
     photos:[],
     submitForm:null,
-    responseTimeout:null
+    responseTimeout:null,
+    pendingRequest:null,
+    activeSubmissionId:'',
+    uploadedBatchIndexes:new Set(),
+    lastPhotoSignature:''
   };
 
   const $ = id => document.getElementById(id);
@@ -455,24 +509,98 @@
 
   $('photos').addEventListener('change', async event => {
     try {
-      const files = Array.from(event.target.files || []).slice(0, MAX_IMAGES);
+      const selectedFiles = Array.from(event.target.files || []);
+      const remainingSlots = MAX_IMAGES - state.photos.length;
+      const files = selectedFiles.slice(0, Math.max(0, remainingSlots));
 
-      state.photos = [];
-      $('photoList').innerHTML = '';
+      if (!files.length && selectedFiles.length) {
+        showError('Ya alcanzaste el máximo de 12 fotografías.');
+        $('photos').value = '';
+        return;
+      }
+
+      showStatus(
+        'Preparando ' + files.length + ' fotografía' + (files.length === 1 ? '' : 's') + '…',
+        'busy'
+      );
 
       for (const file of files) {
         const blob = await compressImage(file, 1280, .72);
-        state.photos.push(blob);
 
-        const image = document.createElement('img');
-        image.src = URL.createObjectURL(blob);
-        image.alt = 'Fotografía seleccionada';
-        $('photoList').appendChild(image);
+        state.photos.push({
+          id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(),
+          blob: blob,
+          name: file.name || 'Fotografía'
+        });
+      }
+
+      $('photos').value = '';
+      renderPhotos();
+
+      if (selectedFiles.length > files.length) {
+        showStatus(
+          'Se alcanzó el máximo de 12 fotografías. Las restantes no fueron agregadas.',
+          'busy'
+        );
+      } else {
+        showStatus(
+          'Fotografías listas para enviar.',
+          'ok'
+        );
       }
     } catch (error) {
       showError('No se pudieron procesar las fotografías. ' + getErrorMessage(error));
     }
   });
+
+  $('clearPhotosButton').addEventListener('click', () => {
+    state.photos = [];
+    renderPhotos();
+    showStatus('Se quitaron todas las fotografías seleccionadas.', 'ok');
+  });
+
+  function removePhoto(photoId) {
+    state.photos = state.photos.filter(item => item.id !== photoId);
+    renderPhotos();
+    showStatus('Fotografía eliminada de la selección.', 'ok');
+  }
+
+  function renderPhotos() {
+    const container = $('photoList');
+    container.innerHTML = '';
+
+    $('photoCount').textContent =
+      'Fotos seleccionadas: ' + state.photos.length + ' / ' + MAX_IMAGES;
+
+    $('clearPhotosButton').hidden = state.photos.length === 0;
+
+    state.photos.forEach((item, index) => {
+      const card = document.createElement('div');
+      card.className = 'photo-card';
+
+      const image = document.createElement('img');
+      image.src = URL.createObjectURL(item.blob);
+      image.alt = 'Fotografía seleccionada ' + (index + 1);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'photo-remove';
+      remove.setAttribute('aria-label', 'Eliminar fotografía ' + (index + 1));
+      remove.textContent = '×';
+      remove.addEventListener('click', () => removePhoto(item.id));
+
+      const meta = document.createElement('div');
+      meta.className = 'photo-meta';
+      meta.textContent =
+        'Foto ' + (index + 1) + ' · ' +
+        (item.blob.size / (1024 * 1024)).toFixed(2) + ' MB';
+
+      card.appendChild(image);
+      card.appendChild(remove);
+      card.appendChild(meta);
+      container.appendChild(card);
+    });
+  }
 
   $('submitButton').addEventListener('click', async () => {
     const accessCode = $('accessCode').value.trim();
@@ -488,7 +616,7 @@
       return;
     }
 
-    if (!state.audioBlob) {
+    if (!state.audioBlob && !state.activeSubmissionId) {
       showError('Graba o adjunta un audio.');
       return;
     }
@@ -496,77 +624,211 @@
     setBusy(true);
 
     try {
-      const images = [];
+      const photoSignature = state.photos
+        .map(item => item.id + ':' + item.blob.size)
+        .join('|');
 
-      for (const blob of state.photos) {
-        images.push({
-          dataUrl:await blobToDataUrl(blob),
-          mimeType:blob.type || 'image/jpeg',
-          caption:''
-        });
+      // Si cambió la selección después de iniciar una carga fallida,
+      // se reinicia la sesión para evitar índices inconsistentes.
+      if (
+        state.activeSubmissionId &&
+        state.lastPhotoSignature &&
+        state.lastPhotoSignature !== photoSignature
+      ) {
+        state.activeSubmissionId = '';
+        state.uploadedBatchIndexes = new Set();
       }
 
-      const payload = {
-        accessCode,
-        project,
-        note:$('note').value.trim(),
-        audio:{
-          dataUrl:await blobToDataUrl(state.audioBlob),
-          mimeType:state.audioMime || state.audioBlob.type || 'audio/webm'
-        },
-        images
-      };
+      state.lastPhotoSignature = photoSignature;
 
-      const totalImageBytes = state.photos.reduce((sum, blob) => sum + blob.size, 0);
-      const totalImageMB = (totalImageBytes / (1024 * 1024)).toFixed(2);
+      // ETAPA 1: guardar audio y abrir sesión.
+      if (!state.activeSubmissionId) {
+        showStatus('Paso 1 de 3 · Guardando audio…', 'busy');
 
+        const startResult = await sendPayload_({
+          action:'start',
+          accessCode,
+          project,
+          note:$('note').value.trim(),
+          audio:{
+            dataUrl:await blobToDataUrl(state.audioBlob),
+            mimeType:state.audioMime || state.audioBlob.type || 'audio/webm'
+          }
+        });
+
+        state.activeSubmissionId = startResult.submissionId;
+        state.uploadedBatchIndexes = new Set();
+      }
+
+      // ETAPA 2: subir fotografías en lotes de máximo 4.
+      const batches = chunkPhotos_(state.photos, 4);
+
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        if (state.uploadedBatchIndexes.has(batchIndex)) {
+          continue;
+        }
+
+        const batch = batches[batchIndex];
+
+        showStatus(
+          'Paso 2 de 3 · Subiendo fotografías ' +
+          (batchIndex * 4 + 1) +
+          '–' +
+          (batchIndex * 4 + batch.length) +
+          ' de ' +
+          state.photos.length +
+          '…',
+          'busy'
+        );
+
+        const images = [];
+
+        for (const item of batch) {
+          images.push({
+            dataUrl:await blobToDataUrl(item.blob),
+            mimeType:item.blob.type || 'image/jpeg',
+            caption:''
+          });
+        }
+
+        await sendPayloadWithRetry_({
+          action:'photo_batch',
+          accessCode,
+          submissionId:state.activeSubmissionId,
+          batchIndex:batchIndex,
+          startPhotoIndex:batchIndex * 4,
+          totalBatches:batches.length,
+          images:images
+        }, 2);
+
+        state.uploadedBatchIndexes.add(batchIndex);
+      }
+
+      // ETAPA 3: IA + documento mensual, usando fotos ya seguras en Drive.
       showStatus(
-        'Enviando audio y ' + images.length + ' fotografía' +
-        (images.length === 1 ? '' : 's') +
-        ' (' + totalImageMB + ' MB). Procesando la visita y actualizando la bitácora mensual…',
+        'Paso 3 de 3 · Organizando la visita y actualizando la bitácora mensual…',
         'busy'
       );
 
-      submitToBackend(payload);
+      const finalResult = await sendPayload_({
+        action:'finalize',
+        accessCode,
+        submissionId:state.activeSubmissionId
+      });
+
+      showStatus(
+        'Visita N.º ' +
+        String(finalResult.visitNumber || '') +
+        ' agregada correctamente. Fotografías: ' +
+        String(finalResult.photoCount ?? state.photos.length) +
+        '.',
+        'ok'
+      );
+
+      resetAfterSuccess();
 
     } catch (error) {
       setBusy(false);
-      showError(getErrorMessage(error));
+
+      showError(
+        getErrorMessage(error) +
+        (
+          state.activeSubmissionId
+            ? ' Puedes presionar nuevamente “Enviar y agregar a bitácora” para continuar desde el último lote completado.'
+            : ''
+        )
+      );
     }
   });
 
-  function submitToBackend(payload) {
+
+  function chunkPhotos_(photos, size) {
+    const batches = [];
+
+    for (let index = 0; index < photos.length; index += size) {
+      batches.push(photos.slice(index, index + size));
+    }
+
+    return batches;
+  }
+
+
+  async function sendPayloadWithRetry_(payload, maxRetries) {
+    let lastError;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await sendPayload_(payload);
+      } catch (error) {
+        lastError = error;
+
+        if (attempt < maxRetries) {
+          showStatus(
+            'Reintentando lote ' +
+            (Number(payload.batchIndex) + 1) +
+            '…',
+            'busy'
+          );
+
+          await wait_(1200 * (attempt + 1));
+        }
+      }
+    }
+
+    throw lastError;
+  }
+
+
+  function wait_(milliseconds) {
+    return new Promise(resolve => setTimeout(resolve, milliseconds));
+  }
+
+
+  function sendPayload_(payload) {
     clearPendingSubmission();
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = BACKEND_URL;
-    form.target = 'resultFrame';
-    form.enctype = 'application/x-www-form-urlencoded';
-    form.style.display = 'none';
+    return new Promise((resolve, reject) => {
+      state.pendingRequest = { resolve, reject };
 
-    const input = document.createElement('textarea');
-    input.name = 'payload';
-    input.value = JSON.stringify(payload);
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = BACKEND_URL;
+      form.target = 'resultFrame';
+      form.enctype = 'application/x-www-form-urlencoded';
+      form.style.display = 'none';
 
-    form.appendChild(input);
-    document.body.appendChild(form);
+      const input = document.createElement('textarea');
+      input.name = 'payload';
+      input.value = JSON.stringify(payload);
 
-    state.submitForm = form;
+      form.appendChild(input);
+      document.body.appendChild(form);
+      state.submitForm = form;
 
-    state.responseTimeout = setTimeout(() => {
-      clearPendingSubmission();
-      setBusy(false);
+      state.responseTimeout = setTimeout(() => {
+        const pending = state.pendingRequest;
 
-      showError(
-        'La página no recibió la confirmación del servidor después de ocho minutos. ' +
-        'No vuelvas a enviar todavía: revisa primero la bitácora y Apps Script → Ejecuciones, ' +
-        'porque el servidor puede haber terminado correctamente.'
-      );
-    }, RESPONSE_TIMEOUT_MS);
+        if (state.submitForm) {
+          state.submitForm.remove();
+          state.submitForm = null;
+        }
 
-    form.submit();
+        state.responseTimeout = null;
+        state.pendingRequest = null;
+
+        if (pending) {
+          pending.reject(
+            new Error(
+              'No se recibió confirmación del servidor dentro del tiempo previsto.'
+            )
+          );
+        }
+      }, RESPONSE_TIMEOUT_MS);
+
+      form.submit();
+    });
   }
+
 
   window.addEventListener('message', event => {
     const data = event.data;
@@ -575,23 +837,32 @@
       return;
     }
 
-    clearPendingSubmission();
-    setBusy(false);
+    const pending = state.pendingRequest;
 
-    if (!data.ok) {
-      showError(data.message || 'No se pudo registrar la visita.');
+    if (state.responseTimeout) {
+      clearTimeout(state.responseTimeout);
+      state.responseTimeout = null;
+    }
+
+    if (state.submitForm) {
+      state.submitForm.remove();
+      state.submitForm = null;
+    }
+
+    state.pendingRequest = null;
+
+    if (!pending) {
       return;
     }
 
-    showStatus(
-      'Visita N.º ' +
-      String(data.visitNumber || '') +
-      ' agregada correctamente a la bitácora mensual. ' +
-      'Fotografías enviadas: ' + state.photos.length + '.',
-      'ok'
-    );
+    if (!data.ok) {
+      pending.reject(
+        new Error(data.message || 'No se pudo completar la operación.')
+      );
+      return;
+    }
 
-    resetAfterSuccess();
+    pending.resolve(data);
   });
 
   function clearPendingSubmission() {
@@ -604,14 +875,19 @@
       state.submitForm.remove();
       state.submitForm = null;
     }
+
+    state.pendingRequest = null;
   }
 
   function resetAfterSuccess() {
     resetAudio();
     state.photos = [];
-    $('photoList').innerHTML = '';
+    state.activeSubmissionId = '';
+    state.uploadedBatchIndexes = new Set();
+    state.lastPhotoSignature = '';
     $('photos').value = '';
     $('note').value = '';
+    renderPhotos();
   }
 
   function setBusy(busy) {
