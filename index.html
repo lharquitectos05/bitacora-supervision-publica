@@ -208,6 +208,33 @@
       padding:9px 12px;
     }
 
+    .process-summary {
+      display:none;
+      margin-top:14px;
+      padding:14px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#f8fcfe;
+      line-height:1.55;
+      font-size:14px;
+    }
+
+    .process-summary.show {
+      display:block;
+    }
+
+    .repair {
+      display:none;
+      margin-top:10px;
+      background:#fff3cd;
+      color:#6b5200;
+      border:1px solid #ead28a;
+    }
+
+    .repair.show {
+      display:block;
+    }
+
     iframe { display:none; }
 
     @media (max-width:480px) {
@@ -291,6 +318,12 @@
     </button>
 
     <div id="status" class="status"></div>
+
+    <div id="processSummary" class="process-summary"></div>
+
+    <button id="repairButton" class="repair" type="button">
+      Reparar fotografías pendientes en el documento
+    </button>
   </section>
 </main>
 
@@ -319,7 +352,8 @@
     activeSubmissionId:'',
     uploadedBatchIndexes:new Set(),
     lastPhotoSignature:'',
-    lastServerStatus:null
+    lastServerStatus:null,
+    repairSubmissionId:''
   };
 
   const $ = id => document.getElementById(id);
@@ -650,6 +684,7 @@
           submissionId:state.activeSubmissionId,
           project,
           note:$('note').value.trim(),
+          expectedPhotoCount:state.photos.length,
           audio:{
             dataUrl:await blobToDataUrl(state.audioBlob),
             mimeType:state.audioMime || state.audioBlob.type || 'audio/webm'
@@ -752,11 +787,34 @@
 
       const finalResult = finalStatus.result || {};
 
+      updateProcessSummary_(finalStatus);
+
+      const savedPhotos = Number(finalResult.photoCount ?? state.photos.length);
+      const insertedPhotos = Number(
+        finalResult.photosInserted ?? finalResult.photoCount ?? state.photos.length
+      );
+
+      if (insertedPhotos < savedPhotos) {
+        setBusy(false);
+        showError(
+          'La visita se guardó, pero solo ' +
+          insertedPhotos +
+          ' de ' +
+          savedPhotos +
+          ' fotografías se insertaron en el documento. ' +
+          'Las fotografías sí permanecen respaldadas en Drive. ' +
+          'Puedes usar el botón “Reparar fotografías pendientes en el documento”.'
+        );
+        return;
+      }
+
       showStatus(
         'Visita N.º ' +
         String(finalResult.visitNumber || '') +
-        ' agregada correctamente. Fotografías: ' +
-        String(finalResult.photoCount ?? state.photos.length) +
+        ' agregada correctamente. Fotos guardadas: ' +
+        savedPhotos +
+        ' · Fotos insertadas en documento: ' +
+        insertedPhotos +
         '.',
         'ok'
       );
@@ -894,6 +952,118 @@
   function wait_(milliseconds) {
     return new Promise(resolve => setTimeout(resolve, milliseconds));
   }
+
+  $('repairButton').addEventListener('click', async () => {
+    const submissionId =
+      state.repairSubmissionId ||
+      state.activeSubmissionId;
+
+    if (!submissionId) {
+      showError('No hay una visita pendiente para reparar.');
+      return;
+    }
+
+    const accessCode = $('accessCode').value.trim();
+
+    if (!accessCode) {
+      showError('Ingresa el código de acceso para reparar la visita.');
+      return;
+    }
+
+    setBusy(true);
+    showStatus(
+      'Reparando fotografías pendientes en el documento…',
+      'busy'
+    );
+
+    try {
+      postPayload_({
+        action:'repair',
+        accessCode,
+        submissionId
+      });
+
+      const repairedStatus = await waitForServer_(
+        submissionId,
+        status =>
+          status.exists &&
+          status.process &&
+          status.process.photosPendingDocument === 0,
+        180000,
+        'La reparación todavía no confirmó la inserción de todas las fotografías.'
+      );
+
+      setBusy(false);
+      updateProcessSummary_(repairedStatus);
+
+      showStatus(
+        'Reparación completada. Las fotografías pendientes fueron incorporadas al documento.',
+        'ok'
+      );
+
+      $('repairButton').classList.remove('show');
+
+    } catch (error) {
+      setBusy(false);
+      showError(getErrorMessage(error));
+    }
+  });
+
+
+  function updateProcessSummary_(serverStatus) {
+    if (!serverStatus || !serverStatus.process) {
+      return;
+    }
+
+    const process = serverStatus.process;
+    const summary = $('processSummary');
+
+    const lines = [
+      (process.audioSaved ? '✓' : '•') +
+        ' Audio: ' +
+        (process.audioSaved ? 'guardado' : 'pendiente'),
+
+      (process.transcriptionCompleted ? '✓' : '•') +
+        ' Transcripción: ' +
+        (process.transcriptionCompleted ? 'procesada' : 'pendiente'),
+
+      (process.documentGenerated ? '✓' : '•') +
+        ' Documento mensual: ' +
+        (process.documentGenerated ? 'generado' : 'pendiente'),
+
+      '✓ Fotografías respaldadas en Drive: ' +
+        Number(process.photosSaved || 0),
+
+      (Number(process.photosPendingDocument || 0) === 0 ? '✓' : '⚠') +
+        ' Fotografías insertadas en documento: ' +
+        Number(process.photosInserted || 0) +
+        ' de ' +
+        Number(process.photosSaved || 0)
+    ];
+
+    if (Number(process.photosPendingDocument || 0) > 0) {
+      lines.push(
+        '⚠ Pendientes de insertar en documento: ' +
+        Number(process.photosPendingDocument || 0)
+      );
+    }
+
+    summary.innerHTML = lines
+      .map(line => '<div>' + escapeHtml(line) + '</div>')
+      .join('');
+
+    summary.classList.add('show');
+
+    state.repairSubmissionId = serverStatus.submissionId || '';
+
+    if (process.repairAvailable) {
+      $('repairButton').classList.add('show');
+    } else {
+      $('repairButton').classList.remove('show');
+    }
+  }
+
+
 
   function resetAfterSuccess() {
     resetAudio();
