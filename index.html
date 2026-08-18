@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión</title>
+  <title>Reporte de supervisión · V2.6.1</title>
 
   <style>
     :root {
@@ -257,6 +257,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
+    <div class="hint">Versión 2.6.1</div>
 
     <p class="lead">
       Graba un audio explicando la visita y adjunta las fotografías necesarias.
@@ -678,12 +679,36 @@
         }
       });
 
-      const documentStatus = await waitForServer_(
-        state.activeSubmissionId,
-        status => status.exists && status.process && status.process.documentGenerated === true,
-        240000,
-        'El audio fue enviado, pero todavía no se confirmó la generación del documento.'
-      );
+      let documentStatus;
+
+      try {
+        documentStatus = await waitForServer_(
+          state.activeSubmissionId,
+          status =>
+            status.exists &&
+            (
+              (status.process && status.process.documentGenerated === true) ||
+              (status.result && status.result.docUrl)
+            ),
+          240000,
+          'El audio fue enviado, pero todavía no se confirmó la generación del documento.'
+        );
+      } catch (waitError) {
+        const lastCheck = await getSubmissionStatus_(state.activeSubmissionId);
+
+        if (
+          lastCheck &&
+          lastCheck.exists &&
+          (
+            (lastCheck.process && lastCheck.process.documentGenerated === true) ||
+            (lastCheck.result && lastCheck.result.docUrl)
+          )
+        ) {
+          documentStatus = lastCheck;
+        } else {
+          throw waitError;
+        }
+      }
 
       updateProcessSummary_(documentStatus);
       setBusy(false);
@@ -1038,16 +1063,11 @@
   }
 
   function setBusy(busy) {
-    $('submitButton').disabled = busy;
     $('recordButton').disabled = busy;
     $('fallbackButton').disabled = busy;
     $('photos').disabled = busy;
     $('project').disabled = busy;
     $('accessCode').disabled = busy;
-
-    $('submitButton').textContent = busy
-      ? 'Procesando…'
-      : 'Enviar y agregar a bitácora';
   }
 
   function updateTimer() {
