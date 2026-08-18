@@ -1,5 +1,4 @@
 
-
 <!doctype html>
 <html lang="es">
 <head>
@@ -304,7 +303,7 @@
     <div id="photoList" class="photo-list"></div>
 
     <p class="hint">
-      Máximo 12 fotografías. Se enviarán automáticamente en lotes de 4 y cada lote se verificará antes de continuar. Puedes eliminar cualquier foto antes de enviar.
+      Máximo 12 fotografías. Primero se procesará el audio y se generará el documento. Después, las fotografías se guardarán en Drive y se incorporarán al documento en lotes de 4. Puedes eliminar cualquier foto antes de enviar.
     </p>
 
     <label for="note">Nota adicional (opcional)</label>
@@ -314,7 +313,7 @@
       placeholder="Por ejemplo: dar prioridad al baño principal."></textarea>
 
     <button id="submitButton" class="submit" type="button">
-      Enviar y agregar a bitácora
+      Procesar reporte
     </button>
 
     <div id="status" class="status"></div>
@@ -662,21 +661,16 @@
         .map(item => item.id + ':' + item.blob.size)
         .join('|');
 
-      if (
-        state.activeSubmissionId &&
-        state.lastPhotoSignature &&
-        state.lastPhotoSignature !== photoSignature
-      ) {
-        state.activeSubmissionId = '';
-        state.uploadedBatchIndexes = new Set();
-      }
-
       state.lastPhotoSignature = photoSignature;
 
+      // ETAPA 1: audio + transcripción + documento.
       if (!state.activeSubmissionId) {
         state.activeSubmissionId = createSubmissionId_();
 
-        showStatus('Paso 1 de 3 · Guardando audio…', 'busy');
+        showStatus(
+          'Etapa 1 · Guardando audio y procesando transcripción…',
+          'busy'
+        );
 
         postPayload_({
           action:'start',
@@ -691,21 +685,37 @@
           }
         });
 
-        await waitForServer_(
+        const documentStatus = await waitForServer_(
           state.activeSubmissionId,
-          status => status.exists === true,
-          90000,
-          'No se confirmó el guardado del audio.'
+          status =>
+            status.exists &&
+            status.process &&
+            status.process.documentGenerated === true,
+          240000,
+          'El audio fue enviado, pero todavía no se confirmó la generación del documento.'
         );
+
+        updateProcessSummary_(documentStatus);
+
+        showStatus(
+          '✓ Audio procesado · ✓ Transcripción completada · ✓ Documento generado. ' +
+          (state.photos.length
+            ? 'Ahora se procesará el registro fotográfico.'
+            : 'Visita completada.'),
+          'ok'
+        );
+
+        if (!state.photos.length) {
+          setBusy(false);
+          resetAfterSuccess();
+          return;
+        }
       }
 
+      // ETAPA 2: fotos, después del documento.
       const batches = chunkPhotos_(state.photos, 4);
 
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        if (state.uploadedBatchIndexes.has(batchIndex)) {
-          continue;
-        }
-
         const before = await getSubmissionStatus_(state.activeSubmissionId);
 
         if (
@@ -714,19 +724,19 @@
           before.batches.includes(batchIndex)
         ) {
           state.uploadedBatchIndexes.add(batchIndex);
+          updateProcessSummary_(before);
           continue;
         }
 
         const batch = batches[batchIndex];
+        const first = batchIndex * 4 + 1;
+        const last = batchIndex * 4 + batch.length;
 
         showStatus(
-          'Paso 2 de 3 · Subiendo fotografías ' +
-          (batchIndex * 4 + 1) +
-          '–' +
-          (batchIndex * 4 + batch.length) +
-          ' de ' +
-          state.photos.length +
-          '…',
+          'Etapa 2 · Fotografías ' +
+          first + '–' + last +
+          ' de ' + state.photos.length +
+          ': guardando en Drive y agregando al documento…',
           'busy'
         );
 
@@ -741,85 +751,57 @@
         }
 
         postPayload_({
-          action:'photo_batch',
+          action:'photo_batch_append',
           accessCode,
           submissionId:state.activeSubmissionId,
           batchIndex,
           startPhotoIndex:batchIndex * 4,
-          totalBatches:batches.length,
           images
         });
 
-        await waitForServer_(
+        const batchStatus = await waitForServer_(
           state.activeSubmissionId,
           status =>
             status.exists &&
             Array.isArray(status.batches) &&
             status.batches.includes(batchIndex),
-          90000,
-          'No se confirmó el lote ' + (batchIndex + 1) + '.'
+          120000,
+          'Las fotografías ' + first + '–' + last +
+          ' no confirmaron su procesamiento.'
         );
 
         state.uploadedBatchIndexes.add(batchIndex);
+        updateProcessSummary_(batchStatus);
       }
 
-      showStatus(
-        'Paso 3 de 3 · Organizando la visita y actualizando la bitácora mensual…',
-        'busy'
-      );
-
-      const currentStatus = await getSubmissionStatus_(state.activeSubmissionId);
-
-      if (currentStatus.status !== 'completed') {
-        postPayload_({
-          action:'finalize',
-          accessCode,
-          submissionId:state.activeSubmissionId
-        });
-      }
-
-      const finalStatus = await waitForServer_(
-        state.activeSubmissionId,
-        status => status.exists && status.status === 'completed' && status.result,
-        240000,
-        'La visita sigue procesándose y todavía no confirmó la finalización.'
-      );
-
-      const finalResult = finalStatus.result || {};
-
+      const finalStatus = await getSubmissionStatus_(state.activeSubmissionId);
       updateProcessSummary_(finalStatus);
 
-      const savedPhotos = Number(finalResult.photoCount ?? state.photos.length);
-      const insertedPhotos = Number(
-        finalResult.photosInserted ?? finalResult.photoCount ?? state.photos.length
-      );
+      const p = finalStatus.process || {};
+      const saved = Number(p.photosSaved || 0);
+      const inserted = Number(p.photosInserted || 0);
 
-      if (insertedPhotos < savedPhotos) {
-        setBusy(false);
+      setBusy(false);
+
+      if (inserted < saved) {
         showError(
-          'La visita se guardó, pero solo ' +
-          insertedPhotos +
-          ' de ' +
-          savedPhotos +
-          ' fotografías se insertaron en el documento. ' +
-          'Las fotografías sí permanecen respaldadas en Drive. ' +
-          'Puedes usar el botón “Reparar fotografías pendientes en el documento”.'
+          'El reporte escrito ya está generado. ' +
+          'Fotos respaldadas en Drive: ' + saved + '. ' +
+          'Fotos agregadas al documento: ' + inserted + '. ' +
+          'Hay ' + (saved - inserted) +
+          ' fotografía(s) pendiente(s); puedes usar “Reparar fotografías pendientes en el documento”.'
         );
         return;
       }
 
       showStatus(
-        'Visita N.º ' +
-        String(finalResult.visitNumber || '') +
-        ' agregada correctamente. Fotos guardadas: ' +
-        savedPhotos +
-        ' · Fotos insertadas en documento: ' +
-        insertedPhotos +
-        '.',
+        'Visita completada correctamente. ' +
+        '✓ Audio · ✓ Transcripción · ✓ Documento · ' +
+        '✓ Fotos en Drive ' + saved + '/' + state.photos.length +
+        ' · ✓ Fotos en documento ' + inserted + '/' + state.photos.length,
         'ok'
       );
 
-      setBusy(false);
       resetAfterSuccess();
 
     } catch (error) {
@@ -829,12 +811,13 @@
         getErrorMessage(error) +
         (
           state.activeSubmissionId
-            ? ' Puedes presionar nuevamente “Enviar y agregar a bitácora”; el sistema continuará desde lo ya guardado.'
+            ? ' El progreso ya confirmado se conserva; vuelve a presionar el botón para continuar.'
             : ''
         )
       );
     }
   });
+
 
 
   function createSubmissionId_() {
@@ -1031,7 +1014,8 @@
         ' Documento mensual: ' +
         (process.documentGenerated ? 'generado' : 'pendiente'),
 
-      '✓ Fotografías respaldadas en Drive: ' +
+      (Number(process.photosSaved || 0) > 0 ? '✓' : '•') +
+        ' Fotografías respaldadas en Drive: ' +
         Number(process.photosSaved || 0),
 
       (Number(process.photosPendingDocument || 0) === 0 ? '✓' : '⚠') +
