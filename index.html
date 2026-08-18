@@ -112,6 +112,16 @@
       margin-top:8px;
     }
 
+    #photoSubmitButton {
+      margin-top:10px;
+      border:1px solid var(--border);
+    }
+
+    #photoSubmitButton:not(:disabled) {
+      background:var(--dark);
+      color:white;
+    }
+
     .timer {
       text-align:center;
       font-size:26px;
@@ -303,7 +313,7 @@
     <div id="photoList" class="photo-list"></div>
 
     <p class="hint">
-      Máximo 12 fotografías. Primero se procesará el audio y se generará el documento. Después, las fotografías se guardarán en Drive y se incorporarán al documento en lotes de 4. Puedes eliminar cualquier foto antes de enviar.
+      Máximo 12 fotografías. Primero completa el Paso 1. Cuando el documento esté generado, se habilitará el Paso 2 para subir las fotografías en lotes de 4. Puedes eliminar cualquier foto antes de subirla.
     </p>
 
     <label for="note">Nota adicional (opcional)</label>
@@ -313,7 +323,11 @@
       placeholder="Por ejemplo: dar prioridad al baño principal."></textarea>
 
     <button id="submitButton" class="submit" type="button">
-      Procesar reporte
+      Paso 1 · Procesar audio y generar documento
+    </button>
+
+    <button id="photoSubmitButton" class="secondary" type="button" disabled>
+      Paso 2 · Subir fotografías al reporte
     </button>
 
     <div id="status" class="status"></div>
@@ -638,110 +652,91 @@
   $('submitButton').addEventListener('click', async () => {
     const accessCode = $('accessCode').value.trim();
     const project = $('project').value.trim();
-
-    if (!accessCode) {
-      showError('Ingresa el código de acceso.');
-      return;
-    }
-
-    if (!project) {
-      showError('Selecciona el proyecto.');
-      return;
-    }
-
-    if (!state.audioBlob && !state.activeSubmissionId) {
-      showError('Graba o adjunta un audio.');
-      return;
-    }
+    if (!accessCode) return showError('Ingresa el código de acceso.');
+    if (!project) return showError('Selecciona el proyecto.');
+    if (!state.audioBlob && !state.activeSubmissionId) return showError('Graba o adjunta un audio.');
 
     setBusy(true);
+    $('submitButton').disabled = true;
+    $('photoSubmitButton').disabled = true;
 
     try {
-      const photoSignature = state.photos
-        .map(item => item.id + ':' + item.blob.size)
-        .join('|');
+      if (!state.activeSubmissionId) state.activeSubmissionId = createSubmissionId_();
 
-      state.lastPhotoSignature = photoSignature;
+      showStatus('Paso 1 · Guardando audio, procesando transcripción y generando documento…','busy');
 
-      // ETAPA 1: audio + transcripción + documento.
-      if (!state.activeSubmissionId) {
-        state.activeSubmissionId = createSubmissionId_();
-
-        showStatus(
-          'Etapa 1 · Guardando audio y procesando transcripción…',
-          'busy'
-        );
-
-        postPayload_({
-          action:'start',
-          accessCode,
-          submissionId:state.activeSubmissionId,
-          project,
-          note:$('note').value.trim(),
-          expectedPhotoCount:state.photos.length,
-          audio:{
-            dataUrl:await blobToDataUrl(state.audioBlob),
-            mimeType:state.audioMime || state.audioBlob.type || 'audio/webm'
-          }
-        });
-
-        const documentStatus = await waitForServer_(
-          state.activeSubmissionId,
-          status =>
-            status.exists &&
-            status.process &&
-            status.process.documentGenerated === true,
-          240000,
-          'El audio fue enviado, pero todavía no se confirmó la generación del documento.'
-        );
-
-        updateProcessSummary_(documentStatus);
-
-        showStatus(
-          '✓ Audio procesado · ✓ Transcripción completada · ✓ Documento generado. ' +
-          (state.photos.length
-            ? 'Ahora se procesará el registro fotográfico.'
-            : 'Visita completada.'),
-          'ok'
-        );
-
-        if (!state.photos.length) {
-          setBusy(false);
-          resetAfterSuccess();
-          return;
+      postPayload_({
+        action:'start',
+        accessCode,
+        submissionId:state.activeSubmissionId,
+        project,
+        note:$('note').value.trim(),
+        expectedPhotoCount:state.photos.length,
+        audio:{
+          dataUrl:await blobToDataUrl(state.audioBlob),
+          mimeType:state.audioMime || state.audioBlob.type || 'audio/webm'
         }
+      });
+
+      const documentStatus = await waitForServer_(
+        state.activeSubmissionId,
+        status => status.exists && status.process && status.process.documentGenerated === true,
+        240000,
+        'El audio fue enviado, pero todavía no se confirmó la generación del documento.'
+      );
+
+      updateProcessSummary_(documentStatus);
+      setBusy(false);
+      $('submitButton').disabled = true;
+      $('photoSubmitButton').disabled = false;
+
+      showStatus(
+        '✓ Paso 1 completado: audio guardado, transcripción procesada y documento generado. Ahora puedes subir las fotografías.',
+        'ok'
+      );
+    } catch (error) {
+      setBusy(false);
+      $('submitButton').disabled = false;
+      $('photoSubmitButton').disabled = true;
+      showError(getErrorMessage(error) + (state.activeSubmissionId ? ' El progreso confirmado se conserva.' : ''));
+    }
+  });
+
+  $('photoSubmitButton').addEventListener('click', async () => {
+    const accessCode = $('accessCode').value.trim();
+    if (!state.activeSubmissionId) return showError('Primero completa el Paso 1.');
+    if (!state.photos.length) return showError('Selecciona al menos una fotografía.');
+
+    setBusy(true);
+    $('submitButton').disabled = true;
+    $('photoSubmitButton').disabled = true;
+
+    try {
+      const ready = await getSubmissionStatus_(state.activeSubmissionId);
+      if (!ready.exists || !ready.process || !ready.process.documentGenerated) {
+        throw new Error('El documento todavía no está listo. Completa primero el Paso 1.');
       }
 
-      // ETAPA 2: fotos, después del documento.
-      const batches = chunkPhotos_(state.photos, 4);
+      const batches = chunkPhotos_(state.photos,4);
 
-      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        const before = await getSubmissionStatus_(state.activeSubmissionId);
-
-        if (
-          before.exists &&
-          Array.isArray(before.batches) &&
-          before.batches.includes(batchIndex)
-        ) {
+      for (let batchIndex=0; batchIndex<batches.length; batchIndex++) {
+        const before=await getSubmissionStatus_(state.activeSubmissionId);
+        if (before.exists && Array.isArray(before.batches) && before.batches.includes(batchIndex)) {
           state.uploadedBatchIndexes.add(batchIndex);
           updateProcessSummary_(before);
           continue;
         }
 
-        const batch = batches[batchIndex];
-        const first = batchIndex * 4 + 1;
-        const last = batchIndex * 4 + batch.length;
+        const batch=batches[batchIndex];
+        const first=batchIndex*4+1;
+        const last=batchIndex*4+batch.length;
 
         showStatus(
-          'Etapa 2 · Fotografías ' +
-          first + '–' + last +
-          ' de ' + state.photos.length +
-          ': guardando en Drive y agregando al documento…',
-          'busy'
+          'Paso 2 · Fotografías '+first+'–'+last+' de '+state.photos.length+
+          ': guardando en Drive y agregando al documento…','busy'
         );
 
-        const images = [];
-
+        const images=[];
         for (const item of batch) {
           images.push({
             dataUrl:await blobToDataUrl(item.blob),
@@ -755,69 +750,51 @@
           accessCode,
           submissionId:state.activeSubmissionId,
           batchIndex,
-          startPhotoIndex:batchIndex * 4,
+          startPhotoIndex:batchIndex*4,
           images
         });
 
-        const batchStatus = await waitForServer_(
+        const batchStatus=await waitForServer_(
           state.activeSubmissionId,
-          status =>
-            status.exists &&
-            Array.isArray(status.batches) &&
-            status.batches.includes(batchIndex),
+          status => status.exists && Array.isArray(status.batches) && status.batches.includes(batchIndex),
           120000,
-          'Las fotografías ' + first + '–' + last +
-          ' no confirmaron su procesamiento.'
+          'Las fotografías '+first+'–'+last+' no confirmaron su procesamiento.'
         );
 
         state.uploadedBatchIndexes.add(batchIndex);
         updateProcessSummary_(batchStatus);
       }
 
-      const finalStatus = await getSubmissionStatus_(state.activeSubmissionId);
+      const finalStatus=await getSubmissionStatus_(state.activeSubmissionId);
       updateProcessSummary_(finalStatus);
-
-      const p = finalStatus.process || {};
-      const saved = Number(p.photosSaved || 0);
-      const inserted = Number(p.photosInserted || 0);
+      const p=finalStatus.process || {};
+      const saved=Number(p.photosSaved || 0);
+      const inserted=Number(p.photosInserted || 0);
 
       setBusy(false);
 
       if (inserted < saved) {
+        $('photoSubmitButton').disabled=false;
         showError(
-          'El reporte escrito ya está generado. ' +
-          'Fotos respaldadas en Drive: ' + saved + '. ' +
-          'Fotos agregadas al documento: ' + inserted + '. ' +
-          'Hay ' + (saved - inserted) +
-          ' fotografía(s) pendiente(s); puedes usar “Reparar fotografías pendientes en el documento”.'
+          'El Paso 1 está completo. Fotos en Drive: '+saved+
+          '. Fotos en documento: '+inserted+
+          '. Hay '+(saved-inserted)+' pendiente(s). Usa “Reparar fotografías pendientes en el documento”.'
         );
         return;
       }
 
+      $('photoSubmitButton').disabled=true;
       showStatus(
-        'Visita completada correctamente. ' +
-        '✓ Audio · ✓ Transcripción · ✓ Documento · ' +
-        '✓ Fotos en Drive ' + saved + '/' + state.photos.length +
-        ' · ✓ Fotos en documento ' + inserted + '/' + state.photos.length,
+        '✓ Paso 2 completado. Fotos en Drive: '+saved+'/'+state.photos.length+
+        ' · Fotos en documento: '+inserted+'/'+state.photos.length+'.',
         'ok'
       );
-
-      resetAfterSuccess();
-
     } catch (error) {
       setBusy(false);
-
-      showError(
-        getErrorMessage(error) +
-        (
-          state.activeSubmissionId
-            ? ' El progreso ya confirmado se conserva; vuelve a presionar el botón para continuar.'
-            : ''
-        )
-      );
+      $('photoSubmitButton').disabled=false;
+      showError(getErrorMessage(error)+' El Paso 1 permanece guardado; puedes reintentar únicamente las fotografías.');
     }
   });
-
 
 
   function createSubmissionId_() {
