@@ -1,10 +1,11 @@
 
+
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V2.6.1</title>
+  <title>Reporte de supervisión · V2.7.1</title>
 
   <style>
     :root {
@@ -120,6 +121,35 @@
     #photoSubmitButton:not(:disabled) {
       background:var(--dark);
       color:white;
+    }
+
+    .visit-picker {
+      margin-top:18px;
+      padding:14px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#f8fcfe;
+    }
+
+    .visit-picker label {
+      margin-top:0;
+    }
+
+    .visit-picker-grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      margin-bottom:8px;
+    }
+
+    .visit-picker-grid .secondary {
+      margin-top:0;
+    }
+
+    @media (max-width:480px) {
+      .visit-picker-grid {
+        grid-template-columns:1fr;
+      }
     }
 
     .timer {
@@ -257,7 +287,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 2.6.1</div>
+    <div class="hint">Versión 2.7.1</div>
 
     <p class="lead">
       Graba un audio explicando la visita y adjunta las fotografías necesarias.
@@ -300,6 +330,23 @@
       O adjuntar un audio existente
     </button>
 
+    <div class="visit-picker">
+      <label for="visitDate">Bitácora para fotografías</label>
+
+      <div class="visit-picker-grid">
+        <input id="visitDate" type="date">
+        <button id="loadVisitsButton" class="secondary" type="button">
+          Buscar bitácoras del día
+        </button>
+      </div>
+
+      <select id="visitSelect">
+        <option value="">Primero procesa un audio o busca una bitácora existente</option>
+      </select>
+
+      <div id="visitPhotoInfo" class="hint"></div>
+    </div>
+
     <label for="photos">Fotografías</label>
 
     <input id="photos" type="file" accept="image/*" multiple>
@@ -314,7 +361,7 @@
     <div id="photoList" class="photo-list"></div>
 
     <p class="hint">
-      Máximo 12 fotografías. Primero completa el Paso 1. Cuando el documento esté generado, se habilitará el Paso 2 para subir las fotografías en lotes de 4. Puedes eliminar cualquier foto antes de subirla.
+      Máximo 12 fotografías por selección. Puedes agregar más fotografías después seleccionando la bitácora del día correspondiente. El sistema informa cuántas fotos ya tiene el documento y bloquea fotografías repetidas.
     </p>
 
     <label for="note">Nota adicional (opcional)</label>
@@ -367,7 +414,9 @@
     uploadedBatchIndexes:new Set(),
     lastPhotoSignature:'',
     lastServerStatus:null,
-    repairSubmissionId:''
+    repairSubmissionId:'',
+    selectedVisitId:'',
+    selectedVisitInfo:null
   };
 
   const $ = id => document.getElementById(id);
@@ -395,6 +444,7 @@
   };
 
   loadProjects();
+  $('visitDate').value = new Date().toISOString().slice(0, 10);
 
   function loadProjects() {
     const script = document.createElement('script');
@@ -578,7 +628,8 @@
         state.photos.push({
           id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(),
           blob: blob,
-          name: file.name || 'Fotografía'
+          name: file.name || 'Fotografía',
+          hash: await hashBlob_(blob)
         });
       }
 
@@ -650,21 +701,47 @@
     });
   }
 
+
+  async function hashBlob_(blob) {
+    if (!window.crypto || !crypto.subtle) {
+      return '';
+    }
+
+    const buffer = await blob.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', buffer);
+
+    return Array.from(new Uint8Array(digest))
+      .map(byte => byte.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+
   $('submitButton').addEventListener('click', async () => {
     const accessCode = $('accessCode').value.trim();
     const project = $('project').value.trim();
+
     if (!accessCode) return showError('Ingresa el código de acceso.');
     if (!project) return showError('Selecciona el proyecto.');
     if (!state.audioBlob && !state.activeSubmissionId) return showError('Graba o adjunta un audio.');
 
-    setBusy(true);
     $('submitButton').disabled = true;
-    $('photoSubmitButton').disabled = true;
 
     try {
-      if (!state.activeSubmissionId) state.activeSubmissionId = createSubmissionId_();
+      if (!state.activeSubmissionId) {
+        state.activeSubmissionId = createSubmissionId_();
+      }
 
-      showStatus('Paso 1 · Guardando audio, procesando transcripción y generando documento…','busy');
+      state.selectedVisitId = state.activeSubmissionId;
+      $('visitSelect').innerHTML =
+        '<option value="' + escapeHtml(state.activeSubmissionId) + '">' +
+        'Visita actual · procesando audio/documento' +
+        '</option>';
+      $('visitSelect').value = state.activeSubmissionId;
+
+      showStatus(
+        'Paso 1 iniciado: audio enviado para transcripción y generación del documento. Ya puedes continuar con las fotografías.',
+        'busy'
+      );
 
       postPayload_({
         action:'start',
@@ -679,147 +756,417 @@
         }
       });
 
-      let documentStatus;
-
-      try {
-        documentStatus = await waitForServer_(
-          state.activeSubmissionId,
-          status =>
-            status.exists &&
-            (
-              (status.process && status.process.documentGenerated === true) ||
-              (status.result && status.result.docUrl)
-            ),
-          240000,
-          'El audio fue enviado, pero todavía no se confirmó la generación del documento.'
-        );
-      } catch (waitError) {
-        const lastCheck = await getSubmissionStatus_(state.activeSubmissionId);
-
-        if (
-          lastCheck &&
-          lastCheck.exists &&
-          (
-            (lastCheck.process && lastCheck.process.documentGenerated === true) ||
-            (lastCheck.result && lastCheck.result.docUrl)
-          )
-        ) {
-          documentStatus = lastCheck;
-        } else {
-          throw waitError;
-        }
-      }
-
-      updateProcessSummary_(documentStatus);
-      setBusy(false);
-      $('submitButton').disabled = true;
       $('photoSubmitButton').disabled = false;
 
       showStatus(
-        '✓ Paso 1 completado: audio guardado, transcripción procesada y documento generado. Ahora puedes subir las fotografías.',
+        '✓ Audio enviado. La transcripción y el documento siguen procesándose. Puedes subir las fotografías desde ahora.',
         'ok'
       );
+
+      monitorDocumentInBackground_(state.activeSubmissionId);
+
     } catch (error) {
-      setBusy(false);
       $('submitButton').disabled = false;
-      $('photoSubmitButton').disabled = true;
-      showError(getErrorMessage(error) + (state.activeSubmissionId ? ' El progreso confirmado se conserva.' : ''));
+      showError(getErrorMessage(error));
     }
   });
 
+  async function monitorDocumentInBackground_(submissionId) {
+    try {
+      const status = await waitForServer_(
+        submissionId,
+        result =>
+          result.exists &&
+          (
+            (result.process && result.process.documentGenerated === true) ||
+            (result.result && result.result.docUrl)
+          ),
+        5 * 60 * 1000,
+        'El documento continúa procesándose.'
+      );
+
+      updateProcessSummary_(status);
+
+      const process = status.process || {};
+      if (Number(process.photosPendingDocument || 0) > 0 && process.repairAvailable) {
+        $('repairButton').classList.add('show');
+      }
+    } catch (_) {}
+  }
+
+
+
+  $('loadVisitsButton').addEventListener('click', async () => {
+    const accessCode = $('accessCode').value.trim();
+    const project = $('project').value.trim();
+    const date = $('visitDate').value;
+
+    if (!accessCode) {
+      return showError('Ingresa el código de acceso.');
+    }
+
+    if (!project) {
+      return showError('Selecciona el proyecto.');
+    }
+
+    showStatus('Buscando bitácoras del día…', 'busy');
+
+    try {
+      const response = await loadVisits_(accessCode, project, date);
+      const visits = Array.isArray(response.visits) ? response.visits : [];
+
+      if (!visits.length) {
+        $('visitSelect').innerHTML =
+          '<option value="">No se encontraron bitácoras para esa fecha</option>';
+        $('visitPhotoInfo').textContent = '';
+        showStatus('No hay bitácoras registradas para la fecha seleccionada.', 'ok');
+        return;
+      }
+
+      $('visitSelect').innerHTML = visits.map(visit => {
+        const label =
+          'Visita ' +
+          (visit.visitNumber || 'sin número') +
+          ' · ' +
+          (visit.reportNumber || 'reporte sin número') +
+          ' · Fotos en documento: ' +
+          Number(visit.photosInserted || 0);
+
+        return (
+          '<option value="' + escapeHtml(visit.submissionId) + '">' +
+          escapeHtml(label) +
+          '</option>'
+        );
+      }).join('');
+
+      state.selectedVisitId = visits[0].submissionId;
+      state.selectedVisitInfo = visits[0];
+      updateSelectedVisitInfo_(visits[0]);
+
+      $('photoSubmitButton').disabled = false;
+      showStatus(
+        'Bitácoras cargadas. Selecciona la visita y agrega fotografías.',
+        'ok'
+      );
+
+    } catch (error) {
+      showError(getErrorMessage(error));
+    }
+  });
+
+
+  $('visitSelect').addEventListener('change', async () => {
+    const submissionId = $('visitSelect').value;
+    state.selectedVisitId = submissionId;
+
+    if (!submissionId) {
+      $('visitPhotoInfo').textContent = '';
+      return;
+    }
+
+    try {
+      const status = await getSubmissionStatus_(submissionId);
+      const process = status.process || {};
+
+      state.selectedVisitInfo = {
+        submissionId,
+        photosSaved:Number(process.photosSaved || 0),
+        photosInserted:Number(process.photosInserted || 0)
+      };
+
+      updateSelectedVisitInfo_(state.selectedVisitInfo);
+      $('photoSubmitButton').disabled = false;
+
+    } catch (_) {}
+  });
+
+
+
+  async function refreshSelectedVisitInfo_(submissionId) {
+    try {
+      const status = await getSubmissionStatus_(submissionId);
+      const process = status.process || {};
+
+      updateSelectedVisitInfo_({
+        photosSaved:Number(process.photosSaved || 0),
+        photosInserted:Number(process.photosInserted || 0)
+      });
+    } catch (_) {}
+  }
+
+
+  function updateSelectedVisitInfo_(visit) {
+    const saved = Number(visit.photosSaved || 0);
+    const inserted = Number(visit.photosInserted || 0);
+
+    $('visitPhotoInfo').textContent =
+      'Esta bitácora ya tiene ' +
+      inserted +
+      ' fotografía' +
+      (inserted === 1 ? '' : 's') +
+      ' en el documento' +
+      (saved > inserted
+        ? ' y ' + (saved - inserted) + ' pendiente(s) respaldada(s) en Drive.'
+        : '.'
+      ) +
+      ' Las fotografías repetidas se detectan y no se vuelven a cargar.';
+  }
+
+
+  function loadVisits_(accessCode, project, date) {
+    return new Promise((resolve, reject) => {
+      const callbackName =
+        '__bitacoraVisits_' +
+        Date.now() +
+        '_' +
+        Math.random().toString(36).slice(2);
+
+      const script = document.createElement('script');
+
+      const cleanup = () => {
+        try { delete window[callbackName]; } catch (_) {}
+        try { script.remove(); } catch (_) {}
+      };
+
+      window[callbackName] = result => {
+        cleanup();
+
+        if (!result || result.ok === false) {
+          reject(new Error(result?.message || 'No se pudieron cargar las bitácoras.'));
+          return;
+        }
+
+        resolve(result);
+      };
+
+      script.src =
+        BACKEND_URL +
+        '?page=visits' +
+        '&accessCode=' + encodeURIComponent(accessCode) +
+        '&project=' + encodeURIComponent(project) +
+        '&date=' + encodeURIComponent(date || '') +
+        '&callback=' + encodeURIComponent(callbackName) +
+        '&t=' + Date.now();
+
+      script.onerror = () => {
+        cleanup();
+        reject(new Error('No se pudieron cargar las bitácoras.'));
+      };
+
+      document.head.appendChild(script);
+    });
+  }
+
+
   $('photoSubmitButton').addEventListener('click', async () => {
     const accessCode = $('accessCode').value.trim();
-    if (!state.activeSubmissionId) return showError('Primero completa el Paso 1.');
+
+    const targetSubmissionId =
+      $('visitSelect').value ||
+      state.selectedVisitId ||
+      targetSubmissionId;
+
+    if (!targetSubmissionId) {
+      return showError('Selecciona la bitácora del día a la que deseas agregar las fotografías.');
+    }
     if (!state.photos.length) return showError('Selecciona al menos una fotografía.');
 
-    setBusy(true);
-    $('submitButton').disabled = true;
     $('photoSubmitButton').disabled = true;
 
     try {
-      const ready = await getSubmissionStatus_(state.activeSubmissionId);
-      if (!ready.exists || !ready.process || !ready.process.documentGenerated) {
-        throw new Error('El documento todavía no está listo. Completa primero el Paso 1.');
-      }
+      await waitForServer_(
+        targetSubmissionId,
+        status => status.exists === true,
+        90 * 1000,
+        'Todavía no se confirmó la recepción inicial del audio.'
+      );
 
-      const batches = chunkPhotos_(state.photos,4);
+      const batches = chunkPhotos_(state.photos, 4);
 
-      for (let batchIndex=0; batchIndex<batches.length; batchIndex++) {
-        const before=await getSubmissionStatus_(state.activeSubmissionId);
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const before = await getSubmissionStatus_(targetSubmissionId);
+
         if (before.exists && Array.isArray(before.batches) && before.batches.includes(batchIndex)) {
           state.uploadedBatchIndexes.add(batchIndex);
           updateProcessSummary_(before);
           continue;
         }
 
-        const batch=batches[batchIndex];
-        const first=batchIndex*4+1;
-        const last=batchIndex*4+batch.length;
+        const batch = batches[batchIndex];
+        const first = batchIndex * 4 + 1;
+        const last = batchIndex * 4 + batch.length;
+
+        const documentReady =
+          before &&
+          before.exists &&
+          (
+            (before.process && before.process.documentGenerated === true) ||
+            (before.result && before.result.docUrl)
+          );
 
         showStatus(
-          'Paso 2 · Fotografías '+first+'–'+last+' de '+state.photos.length+
-          ': guardando en Drive y agregando al documento…','busy'
+          'Paso 2 · Fotografías ' + first + '–' + last + ' de ' + state.photos.length +
+          (documentReady
+            ? ': guardando en Drive y agregando al documento…'
+            : ': guardando en Drive. El documento se actualizará cuando esté disponible…'),
+          'busy'
         );
 
-        const images=[];
+        const images = [];
         for (const item of batch) {
           images.push({
             dataUrl:await blobToDataUrl(item.blob),
             mimeType:item.blob.type || 'image/jpeg',
-            caption:''
+            caption:'',
+            hash:item.hash || ''
           });
         }
 
+        const operationId =
+          (window.crypto && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+
         postPayload_({
-          action:'photo_batch_append',
+          action: documentReady ? 'photo_batch_append' : 'photo_batch',
           accessCode,
-          submissionId:state.activeSubmissionId,
+          operationId,
+          submissionId:targetSubmissionId,
           batchIndex,
-          startPhotoIndex:batchIndex*4,
+          startPhotoIndex:batchIndex * 4,
+          totalBatches:batches.length,
           images
         });
 
-        const batchStatus=await waitForServer_(
-          state.activeSubmissionId,
-          status => status.exists && Array.isArray(status.batches) && status.batches.includes(batchIndex),
-          120000,
-          'Las fotografías '+first+'–'+last+' no confirmaron su procesamiento.'
+        const batchStatus = await waitForServer_(
+          targetSubmissionId,
+          status =>
+            status.exists &&
+            status.lastPhotoOperation &&
+            status.lastPhotoOperation.operationId === operationId,
+          0,
+          ''
         );
 
         state.uploadedBatchIndexes.add(batchIndex);
         updateProcessSummary_(batchStatus);
+        await refreshSelectedVisitInfo_(targetSubmissionId);
+
+        const operation = batchStatus.lastPhotoOperation || {};
+        if (Number(operation.duplicateCount || 0) > 0) {
+          showStatus(
+            'Lote procesado. ' +
+            Number(operation.savedCount || 0) +
+            ' fotografía(s) nueva(s) y ' +
+            Number(operation.duplicateCount || 0) +
+            ' repetida(s) omitida(s).',
+            'ok'
+          );
+        }
       }
 
-      const finalStatus=await getSubmissionStatus_(state.activeSubmissionId);
+      const finalStatus = await getSubmissionStatus_(targetSubmissionId);
       updateProcessSummary_(finalStatus);
-      const p=finalStatus.process || {};
-      const saved=Number(p.photosSaved || 0);
-      const inserted=Number(p.photosInserted || 0);
 
-      setBusy(false);
+      const process = finalStatus.process || {};
+      const saved = Number(process.photosSaved || 0);
+      const inserted = Number(process.photosInserted || 0);
+      const documentReady =
+        process.documentGenerated === true ||
+        Boolean(finalStatus.result && finalStatus.result.docUrl);
 
-      if (inserted < saved) {
-        $('photoSubmitButton').disabled=false;
-        showError(
-          'El Paso 1 está completo. Fotos en Drive: '+saved+
-          '. Fotos en documento: '+inserted+
-          '. Hay '+(saved-inserted)+' pendiente(s). Usa “Reparar fotografías pendientes en el documento”.'
+      $('photoSubmitButton').disabled = false;
+
+      if (!documentReady) {
+        showStatus(
+          '✓ Fotografías respaldadas en Drive: ' + saved + '. ' +
+          'El sistema omitirá automáticamente cualquier fotografía repetida. ' +
+          'La transcripción/documento continúa procesándose y las fotos se incorporarán después sin volver a subirlas.',
+          'ok'
         );
+        monitorAndRepairPhotosInBackground_(targetSubmissionId, accessCode);
         return;
       }
 
-      $('photoSubmitButton').disabled=true;
+      if (inserted < saved) {
+        showStatus(
+          '✓ Fotografías guardadas en Drive: ' + saved +
+          '. Hay ' + (saved - inserted) +
+          ' pendiente(s) de agregar al documento. Se intentará completar automáticamente.',
+          'busy'
+        );
+        monitorAndRepairPhotosInBackground_(targetSubmissionId, accessCode);
+        return;
+      }
+
+      $('photoSubmitButton').disabled = false;
       showStatus(
-        '✓ Paso 2 completado. Fotos en Drive: '+saved+'/'+state.photos.length+
-        ' · Fotos en documento: '+inserted+'/'+state.photos.length+'.',
+        '✓ Fotografías procesadas. Esta bitácora tiene ' + inserted +
+        ' fotografía(s) en el documento. Puedes seleccionar más fotografías y agregarlas después; las repetidas serán omitidas.',
         'ok'
       );
+
     } catch (error) {
-      setBusy(false);
-      $('photoSubmitButton').disabled=false;
-      showError(getErrorMessage(error)+' El Paso 1 permanece guardado; puedes reintentar únicamente las fotografías.');
+      $('photoSubmitButton').disabled = false;
+      showError(
+        getErrorMessage(error) +
+        ' El audio/transcripción no se vuelve a procesar; puedes reintentar únicamente las fotografías.'
+      );
     }
   });
+
+  async function monitorAndRepairPhotosInBackground_(submissionId, accessCode) {
+    try {
+      const ready = await waitForServer_(
+        submissionId,
+        status =>
+          status.exists &&
+          (
+            (status.process && status.process.documentGenerated === true) ||
+            (status.result && status.result.docUrl)
+          ),
+        5 * 60 * 1000,
+        'El documento continúa procesándose.'
+      );
+
+      updateProcessSummary_(ready);
+
+      const process = ready.process || {};
+      const saved = Number(process.photosSaved || 0);
+      const inserted = Number(process.photosInserted || 0);
+
+      if (saved > inserted) {
+        postPayload_({
+          action:'repair',
+          accessCode,
+          submissionId
+        });
+
+        const repaired = await waitForServer_(
+          submissionId,
+          status =>
+            status.exists &&
+            status.process &&
+            Number(status.process.photosPendingDocument || 0) === 0,
+          3 * 60 * 1000,
+          'Las fotografías siguen pendientes de incorporarse al documento.'
+        );
+
+        updateProcessSummary_(repaired);
+
+        const rp = repaired.process || {};
+        showStatus(
+          '✓ Documento confirmado y fotografías incorporadas. Drive: ' +
+          Number(rp.photosSaved || 0) +
+          ' · Documento: ' + Number(rp.photosInserted || 0) + '.',
+          'ok'
+        );
+
+        $('photoSubmitButton').disabled = true;
+        $('repairButton').classList.remove('show');
+      }
+    } catch (_) {}
+  }
 
 
   function createSubmissionId_() {
@@ -915,24 +1262,37 @@
   }
 
 
-  async function waitForServer_(submissionId, predicate, timeoutMs, timeoutMessage) {
-    const started = Date.now();
+  async function waitForServer_(
+    submissionId,
+    predicate,
+    timeoutMs,
+    timeoutMessage
+  ) {
+    let attempts = 0;
 
-    while (Date.now() - started < timeoutMs) {
+    while (true) {
       try {
         const status = await getSubmissionStatus_(submissionId);
 
         if (predicate(status)) {
           return status;
         }
-      } catch (_) {}
+      } catch (_) {
+        // Reintenta indefinidamente: los problemas de red no cancelan el proceso.
+      }
 
-      await wait_(1800);
+      attempts++;
+
+      if (attempts % 15 === 0) {
+        showStatus(
+          'El proceso continúa. No cierres la página; seguiremos esperando la confirmación del servidor.',
+          'busy'
+        );
+      }
+
+      await wait_(2000);
     }
-
-    throw new Error(timeoutMessage);
   }
-
 
   function wait_(milliseconds) {
     return new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -940,6 +1300,8 @@
 
   $('repairButton').addEventListener('click', async () => {
     const submissionId =
+      $('visitSelect').value ||
+      state.selectedVisitId ||
       state.repairSubmissionId ||
       state.activeSubmissionId;
 
