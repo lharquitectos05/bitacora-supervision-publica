@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V2.7.1</title>
+  <title>Reporte de supervisión · V2.8.0</title>
 
   <style>
     :root {
@@ -123,8 +123,34 @@
       color:white;
     }
 
+    .mode-title {
+      margin-top:22px;
+      padding:11px 13px;
+      border-radius:10px;
+      background:#eef8fc;
+      color:var(--dark);
+      font-size:13px;
+      font-weight:800;
+      letter-spacing:.02em;
+      border-left:4px solid var(--dark);
+    }
+
+    .mode-title span {
+      display:block;
+      margin-top:3px;
+      color:var(--muted);
+      font-size:12px;
+      font-weight:400;
+      letter-spacing:0;
+    }
+
+    .mode-title.photo-mode {
+      margin-top:26px;
+      background:#f4fbfe;
+    }
+
     .visit-picker {
-      margin-top:18px;
+      margin-top:10px;
       padding:14px;
       border:1px solid var(--border);
       border-radius:12px;
@@ -287,10 +313,10 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 2.7.1</div>
+    <div class="hint">Versión 2.8.0</div>
 
     <p class="lead">
-      Graba un audio explicando la visita y adjunta las fotografías necesarias.
+      Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
     </p>
 
     <label for="accessCode">Código de acceso</label>
@@ -300,6 +326,11 @@
     <select id="project" required>
       <option value="">Cargando proyectos…</option>
     </select>
+
+    <div class="mode-title">
+      MODO A · NUEVO REPORTE
+      <span>Audio → transcripción → documento</span>
+    </div>
 
     <label>Audio de la visita</label>
 
@@ -330,8 +361,13 @@
       O adjuntar un audio existente
     </button>
 
+    <div class="mode-title photo-mode">
+      MODO B · SOLO FOTOGRAFÍAS
+      <span>No requiere grabar ni procesar audio nuevamente</span>
+    </div>
+
     <div class="visit-picker">
-      <label for="visitDate">Bitácora para fotografías</label>
+      <label for="visitDate">Seleccionar bitácora existente por fecha</label>
 
       <div class="visit-picker-grid">
         <input id="visitDate" type="date">
@@ -341,7 +377,7 @@
       </div>
 
       <select id="visitSelect">
-        <option value="">Primero procesa un audio o busca una bitácora existente</option>
+        <option value="">Busca una fecha y selecciona la bitácora</option>
       </select>
 
       <div id="visitPhotoInfo" class="hint"></div>
@@ -361,7 +397,7 @@
     <div id="photoList" class="photo-list"></div>
 
     <p class="hint">
-      Máximo 12 fotografías por selección. Puedes agregar más fotografías después seleccionando la bitácora del día correspondiente. El sistema informa cuántas fotos ya tiene el documento y bloquea fotografías repetidas.
+      Máximo 12 fotografías por selección. El módulo de fotografías es independiente del audio: busca una bitácora por fecha, selecciónala y sube las fotos. Puedes volver después y agregar más. El sistema informa cuántas fotos ya tiene el documento y bloquea fotografías repetidas.
     </p>
 
     <label for="note">Nota adicional (opcional)</label>
@@ -371,11 +407,15 @@
       placeholder="Por ejemplo: dar prioridad al baño principal."></textarea>
 
     <button id="submitButton" class="submit" type="button">
-      Paso 1 · Procesar audio y generar documento
+      Procesar audio y generar documento
     </button>
 
+    <p class="hint photo-only-note">
+      Para subir solo fotografías: busca la fecha, selecciona la bitácora y elige las imágenes. No necesitas usar el botón de audio.
+    </p>
+
     <button id="photoSubmitButton" class="secondary" type="button" disabled>
-      Paso 2 · Subir fotografías al reporte
+      Subir fotografías a la bitácora seleccionada
     </button>
 
     <div id="status" class="status"></div>
@@ -454,7 +494,14 @@
       Date.now();
 
     script.onerror = () => {
-      showError('No se pudo cargar la lista de proyectos.');
+      $('project').innerHTML =
+        '<option value="">No disponible temporalmente</option>';
+
+      showStatus(
+        'No se pudo cargar la lista de proyectos para crear un reporte nuevo. ' +
+        'El modo “Solo fotografías” sigue disponible: busca la bitácora por fecha.',
+        'busy'
+      );
     };
 
     document.head.appendChild(script);
@@ -805,8 +852,8 @@
       return showError('Ingresa el código de acceso.');
     }
 
-    if (!project) {
-      return showError('Selecciona el proyecto.');
+    if (!date) {
+      return showError('Selecciona la fecha de la bitácora.');
     }
 
     showStatus('Buscando bitácoras del día…', 'busy');
@@ -825,11 +872,12 @@
 
       $('visitSelect').innerHTML = visits.map(visit => {
         const label =
+          (visit.projectName ? visit.projectName + ' · ' : '') +
           'Visita ' +
           (visit.visitNumber || 'sin número') +
           ' · ' +
           (visit.reportNumber || 'reporte sin número') +
-          ' · Fotos en documento: ' +
+          ' · Fotos: ' +
           Number(visit.photosInserted || 0);
 
         return (
@@ -845,7 +893,7 @@
 
       $('photoSubmitButton').disabled = false;
       showStatus(
-        'Bitácoras cargadas. Selecciona la visita y agrega fotografías.',
+        'Bitácoras encontradas. Selecciona la visita; puedes subir fotografías sin procesar audio.',
         'ok'
       );
 
@@ -909,7 +957,8 @@
         ? ' y ' + (saved - inserted) + ' pendiente(s) respaldada(s) en Drive.'
         : '.'
       ) +
-      ' Las fotografías repetidas se detectan y no se vuelven a cargar.';
+      ' Puedes agregar fotografías directamente a esta bitácora sin audio. ' +
+      'Las fotografías repetidas se detectan y no se vuelven a cargar.';
   }
 
 
@@ -977,8 +1026,8 @@
       await waitForServer_(
         targetSubmissionId,
         status => status.exists === true,
-        90 * 1000,
-        'Todavía no se confirmó la recepción inicial del audio.'
+        0,
+        ''
       );
 
       const batches = chunkPhotos_(state.photos, 4);
@@ -1005,7 +1054,7 @@
           );
 
         showStatus(
-          'Paso 2 · Fotografías ' + first + '–' + last + ' de ' + state.photos.length +
+          'Fotografías ' + first + '–' + last + ' de ' + state.photos.length +
           (documentReady
             ? ': guardando en Drive y agregando al documento…'
             : ': guardando en Drive. El documento se actualizará cuando esté disponible…'),
