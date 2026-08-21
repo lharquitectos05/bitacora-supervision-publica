@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V3.0</title>
+  <title>Reporte de supervisión · V3.1.1</title>
 
   <style>
     :root {
@@ -345,7 +345,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 3.0</div>
+    <div class="hint">Versión 3.1.1</div>
 
     <p class="lead">
       Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
@@ -903,13 +903,51 @@
 
     try {
       const response = await loadVisits_(accessCode, project, date);
-      const visits = Array.isArray(response.visits) ? response.visits : [];
+      let visits = Array.isArray(response.visits)
+        ? response.visits.slice()
+        : [];
+
+      if (
+        state.activeSubmissionId &&
+        !visits.some(visit => visit.submissionId === state.activeSubmissionId)
+      ) {
+        try {
+          const currentStatus = await getSubmissionStatus_(state.activeSubmissionId);
+
+          if (
+            currentStatus &&
+            currentStatus.exists &&
+            currentStatus.result &&
+            currentStatus.result.docUrl
+          ) {
+            const currentDate = new Date().toISOString().slice(0, 10);
+
+            if (!date || date === currentDate) {
+              const p = currentStatus.process || {};
+
+              visits.unshift({
+                submissionId:state.activeSubmissionId,
+                projectName:project || 'Proyecto actual',
+                date:currentDate,
+                createdAt:new Date().toISOString(),
+                visitNumber:currentStatus.result.visitNumber || '',
+                reportNumber:currentStatus.result.reportNumber || '',
+                docUrl:currentStatus.result.docUrl || '',
+                status:currentStatus.status || '',
+                photosSaved:Number(p.photosSaved || 0),
+                photosInserted:Number(p.photosInserted || 0),
+                documentGenerated:true
+              });
+            }
+          }
+        } catch (_) {}
+      }
 
       if (!visits.length) {
         $('visitSelect').innerHTML =
           '<option value="">No se encontraron bitácoras para esa fecha</option>';
         $('visitPhotoInfo').textContent = '';
-        showStatus('No hay bitácoras registradas para la fecha seleccionada.', 'ok');
+        showStatus('No se encontraron bitácoras indexadas para esa fecha. Si acabas de generar una, vuelve a presionar “Buscar bitácoras del día”.', 'ok');
         return;
       }
 
@@ -941,7 +979,13 @@
       );
 
     } catch (error) {
-      showError(getErrorMessage(error));
+      $('visitSelect').innerHTML =
+        '<option value="">No se pudo actualizar la lista</option>';
+
+      showError(
+        'No se pudieron cargar las bitácoras: ' +
+        getErrorMessage(error)
+      );
     }
   });
 
@@ -1024,7 +1068,12 @@
         cleanup();
 
         if (!result || result.ok === false) {
-          reject(new Error(result?.message || 'No se pudieron cargar las bitácoras.'));
+          reject(
+            new Error(
+              result?.message ||
+              'No se pudieron cargar las bitácoras.'
+            )
+          );
           return;
         }
 
