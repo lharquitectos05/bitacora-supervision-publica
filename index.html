@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V3.1.1</title>
+  <title>Reporte de supervisión · V3.2.0</title>
 
   <style>
     :root {
@@ -345,7 +345,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 3.1.1</div>
+    <div class="hint">Versión 3.2.0</div>
 
     <p class="lead">
       Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
@@ -413,6 +413,12 @@
       </select>
 
       <div id="visitPhotoInfo" class="hint"></div>
+
+      <button id="recoverDrivePhotosButton"
+              class="repair"
+              type="button">
+        Recuperar fotografías pendientes de Drive
+      </button>
     </div>
 
     <label for="photos">Fotografías</label>
@@ -499,7 +505,9 @@
     lastServerStatus:null,
     repairSubmissionId:'',
     selectedVisitId:'',
-    selectedVisitInfo:null
+    selectedVisitInfo:null,
+    orphanPhotoCount:0,
+    currentVisits:[]
   };
 
   const $ = id => document.getElementById(id);
@@ -943,11 +951,13 @@
         } catch (_) {}
       }
 
+      state.currentVisits = visits;
+
       if (!visits.length) {
         $('visitSelect').innerHTML =
           '<option value="">No se encontraron bitácoras para esa fecha</option>';
         $('visitPhotoInfo').textContent = '';
-        showStatus('No se encontraron bitácoras indexadas para esa fecha. Si acabas de generar una, vuelve a presionar “Buscar bitácoras del día”.', 'ok');
+        showStatus('No se encontró ninguna visita con esa fecha dentro del documento mensual ni en las sesiones registradas.', 'ok');
         return;
       }
 
@@ -956,10 +966,14 @@
           (visit.projectName ? visit.projectName + ' · ' : '') +
           'Visita ' +
           (visit.visitNumber || 'sin número') +
-          ' · ' +
-          (visit.reportNumber || 'reporte sin número') +
-          ' · Fotos: ' +
-          Number(visit.photosInserted || 0);
+          ' · Fotos en documento: ' +
+          Number(visit.photosInserted || 0) +
+          (
+            Number(visit.orphanPhotoCount || 0) > 0
+              ? ' · Pendientes en Drive: ' +
+                Number(visit.orphanPhotoCount || 0)
+              : ''
+          );
 
         return (
           '<option value="' + escapeHtml(visit.submissionId) + '">' +
@@ -996,6 +1010,18 @@
 
     if (!submissionId) {
       $('visitPhotoInfo').textContent = '';
+      $('recoverDrivePhotosButton').classList.remove('show');
+      return;
+    }
+
+    const knownVisit = (state.currentVisits || []).find(
+      visit => visit.submissionId === submissionId
+    );
+
+    if (knownVisit) {
+      state.selectedVisitInfo = knownVisit;
+      updateSelectedVisitInfo_(knownVisit);
+      $('photoSubmitButton').disabled = false;
       return;
     }
 
@@ -1006,7 +1032,8 @@
       state.selectedVisitInfo = {
         submissionId,
         photosSaved:Number(process.photosSaved || 0),
-        photosInserted:Number(process.photosInserted || 0)
+        photosInserted:Number(process.photosInserted || 0),
+        orphanPhotoCount:0
       };
 
       updateSelectedVisitInfo_(state.selectedVisitInfo);
@@ -1014,7 +1041,6 @@
 
     } catch (_) {}
   });
-
 
 
   async function refreshSelectedVisitInfo_(submissionId) {
@@ -1033,19 +1059,52 @@
   function updateSelectedVisitInfo_(visit) {
     const saved = Number(visit.photosSaved || 0);
     const inserted = Number(visit.photosInserted || 0);
+    const orphan = Number(visit.orphanPhotoCount || 0);
 
-    $('visitPhotoInfo').textContent =
-      'Esta bitácora ya tiene ' +
+    state.orphanPhotoCount = orphan;
+
+    let text =
+      'Esta bitácora tiene ' +
       inserted +
       ' fotografía' +
       (inserted === 1 ? '' : 's') +
-      ' en el documento' +
-      (saved > inserted
-        ? ' y ' + (saved - inserted) + ' pendiente(s) respaldada(s) en Drive.'
-        : '.'
-      ) +
+      ' en el documento';
+
+    if (saved > inserted) {
+      text +=
+        ' y ' +
+        (saved - inserted) +
+        ' pendiente(s) ya asociada(s) en Drive';
+    }
+
+    text += '.';
+
+    if (orphan > 0) {
+      text +=
+        ' Además, se encontraron ' +
+        orphan +
+        ' fotografía(s) de esta fecha en Drive que todavía no están asociadas a la bitácora.';
+    }
+
+    text +=
       ' Puedes agregar fotografías directamente a esta bitácora sin audio. ' +
-      'Las fotografías repetidas se detectan y no se vuelven a cargar.';
+      'Las repetidas se detectan y no se vuelven a cargar.';
+
+    $('visitPhotoInfo').textContent = text;
+
+    if (orphan > 0) {
+      $('recoverDrivePhotosButton').classList.add('show');
+      $('recoverDrivePhotosButton').textContent =
+        'Recuperar ' +
+        orphan +
+        ' fotografía' +
+        (orphan === 1 ? '' : 's') +
+        ' pendiente' +
+        (orphan === 1 ? '' : 's') +
+        ' de Drive';
+    } else {
+      $('recoverDrivePhotosButton').classList.remove('show');
+    }
   }
 
 
@@ -1097,6 +1156,79 @@
       document.head.appendChild(script);
     });
   }
+
+
+
+  $('recoverDrivePhotosButton').addEventListener('click', async () => {
+    const accessCode = $('accessCode').value.trim();
+    const submissionId =
+      $('visitSelect').value ||
+      state.selectedVisitId;
+
+    if (!accessCode) {
+      return showError('Ingresa el código de acceso.');
+    }
+
+    if (!submissionId) {
+      return showError(
+        'Selecciona primero la bitácora donde deseas recuperar las fotografías.'
+      );
+    }
+
+    $('recoverDrivePhotosButton').disabled = true;
+
+    showStatus(
+      'Buscando fotografías de esa fecha en Drive e incorporándolas a la bitácora…',
+      'busy'
+    );
+
+    try {
+      postPayload_({
+        action:'recover_date_photos',
+        accessCode,
+        submissionId
+      });
+
+      const previousOrphanCount = Number(
+        state.orphanPhotoCount || 0
+      );
+
+      const status = await waitForServer_(
+        submissionId,
+        current => {
+          if (!current || !current.exists) {
+            return false;
+          }
+
+          const process = current.process || {};
+
+          return (
+            previousOrphanCount === 0 ||
+            Number(process.photosSaved || 0) > 0
+          );
+        },
+        0,
+        ''
+      );
+
+      updateProcessSummary_(status);
+
+      // Vuelve a consultar la fecha completa para actualizar
+      // el contador de huérfanas en Drive.
+      $('loadVisitsButton').click();
+
+      showStatus(
+        '✓ Recuperación terminada. Revisa el contador de fotografías de la bitácora.',
+        'ok'
+      );
+
+    } catch (error) {
+      showError(getErrorMessage(error));
+
+    } finally {
+      $('recoverDrivePhotosButton').disabled = false;
+    }
+  });
 
 
   $('photoSubmitButton').addEventListener('click', async () => {
