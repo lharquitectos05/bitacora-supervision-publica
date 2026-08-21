@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V2.8.0</title>
+  <title>Reporte de supervisión · V3.0</title>
 
   <style>
     :root {
@@ -147,6 +147,38 @@
     .mode-title.photo-mode {
       margin-top:26px;
       background:#f4fbfe;
+    }
+
+    .photo-progress-wrap {
+      margin-top:14px;
+      padding:13px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#f8fcfe;
+    }
+
+    .photo-progress-head {
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      margin-bottom:8px;
+      font-size:14px;
+    }
+
+    .photo-progress-track {
+      width:100%;
+      height:14px;
+      border-radius:999px;
+      overflow:hidden;
+      background:#dceff7;
+    }
+
+    .photo-progress-bar {
+      width:0%;
+      height:100%;
+      background:var(--dark);
+      transition:width .25s ease;
     }
 
     .visit-picker {
@@ -313,7 +345,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 2.8.0</div>
+    <div class="hint">Versión 3.0</div>
 
     <p class="lead">
       Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
@@ -397,7 +429,7 @@
     <div id="photoList" class="photo-list"></div>
 
     <p class="hint">
-      Máximo 12 fotografías por selección. El módulo de fotografías es independiente del audio: busca una bitácora por fecha, selecciónala y sube las fotos. Puedes volver después y agregar más. El sistema informa cuántas fotos ya tiene el documento y bloquea fotografías repetidas.
+      Puedes seleccionar de 1 a 12 fotografías por carga. Se suben una por una para evitar fallos y verás el avance en pantalla. Puedes volver después y agregar más a la misma bitácora. Las repetidas se omiten automáticamente.
     </p>
 
     <label for="note">Nota adicional (opcional)</label>
@@ -414,8 +446,19 @@
       Para subir solo fotografías: busca la fecha, selecciona la bitácora y elige las imágenes. No necesitas usar el botón de audio.
     </p>
 
+    <div id="photoProgressWrap" class="photo-progress-wrap" hidden>
+      <div class="photo-progress-head">
+        <span id="photoProgressText">Preparando fotografías…</span>
+        <strong id="photoProgressCount">0 / 0</strong>
+      </div>
+      <div class="photo-progress-track">
+        <div id="photoProgressBar" class="photo-progress-bar"></div>
+      </div>
+      <div id="photoProgressDetail" class="hint"></div>
+    </div>
+
     <button id="photoSubmitButton" class="secondary" type="button" disabled>
-      Subir fotografías a la bitácora seleccionada
+      Subir solo fotografías a esta bitácora
     </button>
 
     <div id="status" class="status"></div>
@@ -1009,20 +1052,40 @@
 
   $('photoSubmitButton').addEventListener('click', async () => {
     const accessCode = $('accessCode').value.trim();
-
     const targetSubmissionId =
       $('visitSelect').value ||
       state.selectedVisitId ||
-      targetSubmissionId;
+      state.activeSubmissionId;
+
+    if (!accessCode) {
+      return showError('Ingresa el código de acceso.');
+    }
 
     if (!targetSubmissionId) {
-      return showError('Selecciona la bitácora del día a la que deseas agregar las fotografías.');
+      return showError(
+        'Selecciona primero la bitácora a la que deseas agregar las fotografías.'
+      );
     }
-    if (!state.photos.length) return showError('Selecciona al menos una fotografía.');
+
+    if (!state.photos.length) {
+      return showError('Selecciona al menos una fotografía.');
+    }
 
     $('photoSubmitButton').disabled = true;
+    $('photos').disabled = true;
+    $('clearPhotosButton').disabled = true;
+
+    const total = state.photos.length;
+    let completed = 0;
+    let newPhotos = 0;
+    let duplicates = 0;
+    let insertedNow = 0;
+
+    $('photoProgressWrap').hidden = false;
+    updatePhotoProgress_(0, total, 'Iniciando carga…');
 
     try {
+      // Confirma únicamente que la bitácora existe.
       await waitForServer_(
         targetSubmissionId,
         status => status.exists === true,
@@ -1030,192 +1093,164 @@
         ''
       );
 
-      const batches = chunkPhotos_(state.photos, 4);
-
-      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        const before = await getSubmissionStatus_(targetSubmissionId);
-
-        if (before.exists && Array.isArray(before.batches) && before.batches.includes(batchIndex)) {
-          state.uploadedBatchIndexes.add(batchIndex);
-          updateProcessSummary_(before);
-          continue;
-        }
-
-        const batch = batches[batchIndex];
-        const first = batchIndex * 4 + 1;
-        const last = batchIndex * 4 + batch.length;
-
-        const documentReady =
-          before &&
-          before.exists &&
-          (
-            (before.process && before.process.documentGenerated === true) ||
-            (before.result && before.result.docUrl)
-          );
-
-        showStatus(
-          'Fotografías ' + first + '–' + last + ' de ' + state.photos.length +
-          (documentReady
-            ? ': guardando en Drive y agregando al documento…'
-            : ': guardando en Drive. El documento se actualizará cuando esté disponible…'),
-          'busy'
-        );
-
-        const images = [];
-        for (const item of batch) {
-          images.push({
-            dataUrl:await blobToDataUrl(item.blob),
-            mimeType:item.blob.type || 'image/jpeg',
-            caption:'',
-            hash:item.hash || ''
-          });
-        }
-
+      for (let index = 0; index < state.photos.length; index++) {
+        const item = state.photos[index];
         const operationId =
           (window.crypto && crypto.randomUUID)
             ? crypto.randomUUID()
             : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
 
+        updatePhotoProgress_(
+          completed,
+          total,
+          'Subiendo fotografía ' + (index + 1) + ' de ' + total + '…'
+        );
+
         postPayload_({
-          action: documentReady ? 'photo_batch_append' : 'photo_batch',
+          action:'photo_single',
           accessCode,
-          operationId,
           submissionId:targetSubmissionId,
-          batchIndex,
-          startPhotoIndex:batchIndex * 4,
-          totalBatches:batches.length,
-          images
+          operationId,
+          photoIndex:index + 1,
+          image:{
+            dataUrl:await blobToDataUrl(item.blob),
+            mimeType:item.blob.type || 'image/jpeg',
+            caption:'',
+            hash:item.hash || ''
+          }
         });
 
-        const batchStatus = await waitForServer_(
+        const operationStatus = await waitForPhotoOperation_(operationId);
+
+        if (operationStatus.state === 'error') {
+          throw new Error(
+            operationStatus.message ||
+            'Falló la fotografía ' + (index + 1) + '.'
+          );
+        }
+
+        const result = operationStatus.result || {};
+
+        if (result.duplicate) {
+          duplicates++;
+        } else {
+          newPhotos++;
+        }
+
+        if (result.inserted) {
+          insertedNow++;
+        }
+
+        completed++;
+
+        updatePhotoProgress_(
+          completed,
+          total,
+          completed === total
+            ? 'Carga de fotografías terminada.'
+            : 'Fotografía ' + completed + ' completada. Continuando…'
+        );
+      }
+
+      // Al terminar todas, consulta estado actual.
+      let status = await getSubmissionStatus_(targetSubmissionId);
+      updateProcessSummary_(status);
+      await refreshSelectedVisitInfo_(targetSubmissionId);
+
+      const process = status.process || {};
+      const saved = Number(process.photosSaved || 0);
+      const inserted = Number(process.photosInserted || 0);
+
+      // Si el documento existe y hay fotos pendientes, repara automáticamente.
+      if (
+        saved > inserted &&
+        (
+          process.documentGenerated === true ||
+          Boolean(status.result && status.result.docUrl)
+        )
+      ) {
+        $('photoProgressDetail').textContent =
+          'Todas las fotos ya están en Drive. Incorporando las pendientes al documento…';
+
+        postPayload_({
+          action:'repair',
+          accessCode,
+          submissionId:targetSubmissionId
+        });
+
+        status = await waitForServer_(
           targetSubmissionId,
-          status =>
-            status.exists &&
-            status.lastPhotoOperation &&
-            status.lastPhotoOperation.operationId === operationId,
+          current =>
+            current.exists &&
+            current.process &&
+            Number(current.process.photosPendingDocument || 0) === 0,
           0,
           ''
         );
 
-        state.uploadedBatchIndexes.add(batchIndex);
-        updateProcessSummary_(batchStatus);
+        updateProcessSummary_(status);
         await refreshSelectedVisitInfo_(targetSubmissionId);
-
-        const operation = batchStatus.lastPhotoOperation || {};
-        if (Number(operation.duplicateCount || 0) > 0) {
-          showStatus(
-            'Lote procesado. ' +
-            Number(operation.savedCount || 0) +
-            ' fotografía(s) nueva(s) y ' +
-            Number(operation.duplicateCount || 0) +
-            ' repetida(s) omitida(s).',
-            'ok'
-          );
-        }
       }
 
-      const finalStatus = await getSubmissionStatus_(targetSubmissionId);
-      updateProcessSummary_(finalStatus);
+      const finalProcess = (status && status.process) || {};
+      const finalSaved = Number(finalProcess.photosSaved || 0);
+      const finalInserted = Number(finalProcess.photosInserted || 0);
 
-      const process = finalStatus.process || {};
-      const saved = Number(process.photosSaved || 0);
-      const inserted = Number(process.photosInserted || 0);
-      const documentReady =
-        process.documentGenerated === true ||
-        Boolean(finalStatus.result && finalStatus.result.docUrl);
+      updatePhotoProgress_(total, total, 'Proceso finalizado.');
 
-      $('photoSubmitButton').disabled = false;
+      $('photoProgressDetail').textContent =
+        'Nuevas: ' + newPhotos +
+        ' · Repetidas omitidas: ' + duplicates +
+        ' · Total en Drive: ' + finalSaved +
+        ' · Total en documento: ' + finalInserted;
 
-      if (!documentReady) {
-        showStatus(
-          '✓ Fotografías respaldadas en Drive: ' + saved + '. ' +
-          'El sistema omitirá automáticamente cualquier fotografía repetida. ' +
-          'La transcripción/documento continúa procesándose y las fotos se incorporarán después sin volver a subirlas.',
-          'ok'
-        );
-        monitorAndRepairPhotosInBackground_(targetSubmissionId, accessCode);
-        return;
-      }
-
-      if (inserted < saved) {
-        showStatus(
-          '✓ Fotografías guardadas en Drive: ' + saved +
-          '. Hay ' + (saved - inserted) +
-          ' pendiente(s) de agregar al documento. Se intentará completar automáticamente.',
-          'busy'
-        );
-        monitorAndRepairPhotosInBackground_(targetSubmissionId, accessCode);
-        return;
-      }
-
-      $('photoSubmitButton').disabled = false;
       showStatus(
-        '✓ Fotografías procesadas. Esta bitácora tiene ' + inserted +
-        ' fotografía(s) en el documento. Puedes seleccionar más fotografías y agregarlas después; las repetidas serán omitidas.',
+        '✓ Fotografías procesadas correctamente. ' +
+        newPhotos + ' nueva(s), ' +
+        duplicates + ' repetida(s) omitida(s).',
         'ok'
       );
 
+      // Limpia solo las fotos seleccionadas para permitir agregar más después.
+      state.photos = [];
+      $('photos').value = '';
+      renderPhotos();
+
     } catch (error) {
-      $('photoSubmitButton').disabled = false;
+      $('photoProgressDetail').textContent =
+        'Se detuvo en ' + completed + ' de ' + total +
+        '. Las fotografías ya completadas permanecen guardadas.';
+
       showError(
         getErrorMessage(error) +
-        ' El audio/transcripción no se vuelve a procesar; puedes reintentar únicamente las fotografías.'
+        ' Puedes volver a presionar “Subir solo fotografías” y las repetidas se omitirán.'
       );
+
+    } finally {
+      $('photoSubmitButton').disabled = false;
+      $('photos').disabled = false;
+      $('clearPhotosButton').disabled = false;
     }
   });
 
-  async function monitorAndRepairPhotosInBackground_(submissionId, accessCode) {
-    try {
-      const ready = await waitForServer_(
-        submissionId,
-        status =>
-          status.exists &&
-          (
-            (status.process && status.process.documentGenerated === true) ||
-            (status.result && status.result.docUrl)
-          ),
-        5 * 60 * 1000,
-        'El documento continúa procesándose.'
-      );
 
-      updateProcessSummary_(ready);
+  function updatePhotoProgress_(completed, total, detail) {
+    const safeTotal = Math.max(1, Number(total || 1));
+    const safeCompleted = Math.max(0, Math.min(Number(completed || 0), safeTotal));
+    const percent = Math.round((safeCompleted / safeTotal) * 100);
 
-      const process = ready.process || {};
-      const saved = Number(process.photosSaved || 0);
-      const inserted = Number(process.photosInserted || 0);
+    $('photoProgressCount').textContent =
+      safeCompleted + ' / ' + Number(total || 0);
 
-      if (saved > inserted) {
-        postPayload_({
-          action:'repair',
-          accessCode,
-          submissionId
-        });
+    $('photoProgressBar').style.width = percent + '%';
 
-        const repaired = await waitForServer_(
-          submissionId,
-          status =>
-            status.exists &&
-            status.process &&
-            Number(status.process.photosPendingDocument || 0) === 0,
-          3 * 60 * 1000,
-          'Las fotografías siguen pendientes de incorporarse al documento.'
-        );
+    $('photoProgressText').textContent =
+      percent + '% completado';
 
-        updateProcessSummary_(repaired);
-
-        const rp = repaired.process || {};
-        showStatus(
-          '✓ Documento confirmado y fotografías incorporadas. Drive: ' +
-          Number(rp.photosSaved || 0) +
-          ' · Documento: ' + Number(rp.photosInserted || 0) + '.',
-          'ok'
-        );
-
-        $('photoSubmitButton').disabled = true;
-        $('repairButton').classList.remove('show');
-      }
-    } catch (_) {}
+    $('photoProgressDetail').textContent = String(detail || '');
   }
+
+
 
 
   function createSubmissionId_() {
@@ -1257,6 +1292,80 @@
     setTimeout(() => {
       try { form.remove(); } catch (_) {}
     }, 5000);
+  }
+
+
+
+  function getPhotoOperationStatus_(operationId) {
+    return new Promise((resolve, reject) => {
+      const callbackName =
+        '__photoOperation_' +
+        Date.now() +
+        '_' +
+        Math.random().toString(36).slice(2);
+
+      const script = document.createElement('script');
+
+      const cleanup = () => {
+        try { delete window[callbackName]; } catch (_) {}
+        try { script.remove(); } catch (_) {}
+      };
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('No se pudo consultar el estado de las fotografías.'));
+      }, 15000);
+
+      window[callbackName] = result => {
+        clearTimeout(timeout);
+        cleanup();
+        resolve(result || {});
+      };
+
+      script.src =
+        BACKEND_URL +
+        '?page=photoop' +
+        '&operationId=' + encodeURIComponent(operationId) +
+        '&callback=' + encodeURIComponent(callbackName) +
+        '&t=' + Date.now();
+
+      script.onerror = () => {
+        clearTimeout(timeout);
+        cleanup();
+        reject(new Error('No se pudo consultar el estado de las fotografías.'));
+      };
+
+      document.head.appendChild(script);
+    });
+  }
+
+
+  async function waitForPhotoOperation_(operationId) {
+    let attempts = 0;
+
+    while (true) {
+      try {
+        const status = await getPhotoOperationStatus_(operationId);
+
+        if (status.state === 'completed' || status.state === 'error') {
+          return status;
+        }
+      } catch (_) {
+        // Una consulta aislada puede fallar; continuamos.
+      }
+
+      attempts++;
+
+      if (attempts % 5 === 0) {
+        showStatus(
+          'Las fotografías siguen procesándose. ' +
+          'No es necesario volver a presionar el botón; seguimos verificando el servidor.',
+          'busy'
+        );
+      }
+
+      await wait_(2000);
+    }
   }
 
 
