@@ -1,11 +1,10 @@
 
-
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V3.2.0</title>
+  <title>Reporte de supervisión · V3.2.1</title>
 
   <style>
     :root {
@@ -204,6 +203,13 @@
       margin-top:0;
     }
 
+    .date-long-preview {
+      margin:-1px 0 10px;
+      color:var(--dark);
+      font-size:14px;
+      font-weight:700;
+    }
+
     @media (max-width:480px) {
       .visit-picker-grid {
         grid-template-columns:1fr;
@@ -345,7 +351,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 3.2.0</div>
+    <div class="hint">Versión 3.2.1</div>
 
     <p class="lead">
       Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
@@ -407,6 +413,8 @@
           Buscar bitácoras del día
         </button>
       </div>
+
+      <div id="visitDateLong" class="date-long-preview"></div>
 
       <select id="visitSelect">
         <option value="">Busca una fecha y selecciona la bitácora</option>
@@ -536,6 +544,70 @@
 
   loadProjects();
   $('visitDate').value = new Date().toISOString().slice(0, 10);
+  updateVisitDateLong_();
+
+  $('visitDate').addEventListener('change', updateVisitDateLong_);
+
+
+  function formatDateLongClient_(isoDate) {
+    const match = String(isoDate || '').match(
+      /^(\d{4})-(\d{2})-(\d{2})$/
+    );
+
+    if (!match) {
+      return '';
+    }
+
+    const date = new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3])
+    );
+
+    const weekdays = [
+      'Domingo',
+      'Lunes',
+      'Martes',
+      'Miércoles',
+      'Jueves',
+      'Viernes',
+      'Sábado'
+    ];
+
+    const months = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre'
+    ];
+
+    return (
+      weekdays[date.getDay()] +
+      ' ' +
+      date.getDate() +
+      ' de ' +
+      months[date.getMonth()] +
+      ' de ' +
+      date.getFullYear()
+    );
+  }
+
+
+  function updateVisitDateLong_() {
+    $('visitDateLong').textContent =
+      formatDateLongClient_(
+        $('visitDate').value
+      );
+  }
+
 
   function loadProjects() {
     const script = document.createElement('script');
@@ -964,7 +1036,8 @@
       $('visitSelect').innerHTML = visits.map(visit => {
         const label =
           (visit.projectName ? visit.projectName + ' · ' : '') +
-          'Visita ' +
+          formatDateLongClient_(visit.date || date) +
+          ' · Visita ' +
           (visit.visitNumber || 'sin número') +
           ' · Fotos en documento: ' +
           Number(visit.photosInserted || 0) +
