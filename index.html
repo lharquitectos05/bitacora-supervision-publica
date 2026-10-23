@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V3.2.2</title>
+  <title>Reporte de supervisión · V3.2.1-RESTABLECIDA</title>
 
   <style>
     :root {
@@ -351,7 +351,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 3.2.2</div>
+    <div class="hint">Versión 3.2.1-RESTABLECIDA</div>
 
     <p class="lead">
       Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
@@ -545,7 +545,6 @@
   loadProjects();
   $('visitDate').value = new Date().toISOString().slice(0, 10);
   updateVisitDateLong_();
-
   $('visitDate').addEventListener('change', updateVisitDateLong_);
 
 
@@ -602,7 +601,13 @@
 
 
   function updateVisitDateLong_() {
-    $('visitDateLong').textContent =
+    const target = $('visitDateLong');
+
+    if (!target) {
+      return;
+    }
+
+    target.textContent =
       formatDateLongClient_(
         $('visitDate').value
       );
@@ -890,36 +895,26 @@
     const accessCode = $('accessCode').value.trim();
     const project = $('project').value.trim();
 
-    if (!accessCode) {
-      return showError('Ingresa el código de acceso.');
-    }
-
-    if (!project) {
-      return showError('Selecciona el proyecto.');
-    }
-
-    if (!state.audioBlob) {
-      return showError('Graba o adjunta un audio.');
-    }
+    if (!accessCode) return showError('Ingresa el código de acceso.');
+    if (!project) return showError('Selecciona el proyecto.');
+    if (!state.audioBlob && !state.activeSubmissionId) return showError('Graba o adjunta un audio.');
 
     $('submitButton').disabled = true;
-    $('photoSubmitButton').disabled = true;
 
     try {
-      state.activeSubmissionId = createSubmissionId_();
+      if (!state.activeSubmissionId) {
+        state.activeSubmissionId = createSubmissionId_();
+      }
+
       state.selectedVisitId = state.activeSubmissionId;
-
       $('visitSelect').innerHTML =
-        '<option value="' +
-        escapeHtml(state.activeSubmissionId) +
-        '">' +
-        'Visita actual · creando documento' +
+        '<option value="' + escapeHtml(state.activeSubmissionId) + '">' +
+        'Visita actual · procesando audio/documento' +
         '</option>';
-
       $('visitSelect').value = state.activeSubmissionId;
 
       showStatus(
-        'Procesando audio y creando el documento. Las fotografías se habilitarán cuando el documento esté listo.',
+        'Paso 1 iniciado: audio enviado para transcripción y generación del documento. Ya puedes continuar con las fotografías.',
         'busy'
       );
 
@@ -932,68 +927,24 @@
         expectedPhotoCount:state.photos.length,
         audio:{
           dataUrl:await blobToDataUrl(state.audioBlob),
-          mimeType:
-            state.audioMime ||
-            state.audioBlob.type ||
-            'audio/webm'
+          mimeType:state.audioMime || state.audioBlob.type || 'audio/webm'
         }
       });
 
-      const status = await waitForServer_(
-        state.activeSubmissionId,
-        result =>
-          result.exists &&
-          (
-            (
-              result.process &&
-              result.process.documentGenerated === true
-            ) ||
-            (
-              result.result &&
-              result.result.docUrl
-            )
-          ),
-        8 * 60 * 1000,
-        'El documento tardó demasiado en generarse.'
-      );
-
-      updateProcessSummary_(status);
-
-      const process = status.process || {};
+      $('photoSubmitButton').disabled = false;
 
       showStatus(
-        '✓ Documento generado correctamente.' +
-        (
-          state.photos.length
-            ? ' Ya puedes subir las fotografías seleccionadas.'
-            : ''
-        ),
+        '✓ Audio enviado. La transcripción y el documento siguen procesándose. Puedes subir las fotografías desde ahora.',
         'ok'
       );
 
-      $('photoSubmitButton').disabled =
-        state.photos.length === 0;
-
-      $('submitButton').disabled = false;
-
-      if (
-        Number(process.photosPendingDocument || 0) > 0 &&
-        process.repairAvailable
-      ) {
-        $('repairButton').classList.add('show');
-      }
+      monitorDocumentInBackground_(state.activeSubmissionId);
 
     } catch (error) {
       $('submitButton').disabled = false;
-      $('photoSubmitButton').disabled = true;
-
-      showError(
-        'No se pudo generar el documento: ' +
-        getErrorMessage(error)
-      );
+      showError(getErrorMessage(error));
     }
   });
-
 
   async function monitorDocumentInBackground_(submissionId) {
     try {
@@ -1734,56 +1685,24 @@
     timeoutMs,
     timeoutMessage
   ) {
-    const startedAt = Date.now();
     let attempts = 0;
 
     while (true) {
       try {
         const status = await getSubmissionStatus_(submissionId);
 
-        if (
-          status &&
-          (
-            status.status === 'error' ||
-            status.errorMessage
-          )
-        ) {
-          throw new Error(
-            status.errorMessage ||
-            'El servidor informó un error al procesar la visita.'
-          );
-        }
-
         if (predicate(status)) {
           return status;
         }
-
-      } catch (error) {
-        const message = getErrorMessage(error);
-
-        if (
-          message &&
-          message !== 'No se pudo consultar el estado del servidor.'
-        ) {
-          throw error;
-        }
+      } catch (_) {
+        // Reintenta indefinidamente: los problemas de red no cancelan el proceso.
       }
 
       attempts++;
 
-      if (
-        timeoutMs &&
-        Date.now() - startedAt >= timeoutMs
-      ) {
-        throw new Error(
-          timeoutMessage ||
-          'El servidor no confirmó el proceso dentro del tiempo esperado.'
-        );
-      }
-
-      if (attempts % 10 === 0) {
+      if (attempts % 15 === 0) {
         showStatus(
-          'El proceso continúa en el servidor. No cierres la página.',
+          'El proceso continúa. No cierres la página; seguiremos esperando la confirmación del servidor.',
           'busy'
         );
       }
@@ -1791,7 +1710,6 @@
       await wait_(2000);
     }
   }
-
 
   function wait_(milliseconds) {
     return new Promise(resolve => setTimeout(resolve, milliseconds));
