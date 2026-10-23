@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V3.2.0 ESTABLE FIX</title>
+  <title>Reporte de supervisión · V3.2.0 DIAGNÓSTICO FINAL</title>
 
   <style>
     :root {
@@ -344,7 +344,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 3.2.0 · ESTABLE FIX</div>
+    <div class="hint">Versión 3.2.0 · DIAGNÓSTICO FINAL</div>
 
     <p class="lead">
       Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
@@ -879,16 +879,42 @@
             (result.result && result.result.docUrl)
           ),
         5 * 60 * 1000,
-        'El documento continúa procesándose.'
+        'El documento no fue confirmado dentro de 5 minutos.'
       );
 
       updateProcessSummary_(status);
 
       const process = status.process || {};
-      if (Number(process.photosPendingDocument || 0) > 0 && process.repairAvailable) {
+
+      showStatus(
+        '✓ Documento generado correctamente.',
+        'ok'
+      );
+
+      $('submitButton').disabled = false;
+
+      if (
+        Number(process.photosPendingDocument || 0) > 0 &&
+        process.repairAvailable
+      ) {
         $('repairButton').classList.add('show');
       }
-    } catch (_) {}
+
+    } catch (error) {
+      $('submitButton').disabled = false;
+
+      showError(
+        'Error al generar el documento: ' +
+        getErrorMessage(error)
+      );
+
+      try {
+        const latestStatus =
+          await getSubmissionStatus_(submissionId);
+
+        updateProcessSummary_(latestStatus);
+      } catch (_) {}
+    }
   }
 
 
