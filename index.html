@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V3.2.0</title>
+  <title>Reporte de supervisión · V3.2.0 POST FIX</title>
 
   <style>
     :root {
@@ -344,7 +344,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 3.2.0</div>
+    <div class="hint">Versión 3.2.0 · POST FIX</div>
 
     <p class="lead">
       Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
@@ -1454,11 +1454,56 @@
 
 
   function postPayload_(payload) {
+    const encodedBody =
+      'payload=' +
+      encodeURIComponent(
+        JSON.stringify(payload)
+      );
+
+    // Método principal:
+    // POST directo sin esperar/leer la respuesta.
+    // El estado se sigue consultando después por doGet.
+    try {
+      fetch(BACKEND_URL, {
+        method:'POST',
+        mode:'no-cors',
+        credentials:'omit',
+        redirect:'follow',
+        headers:{
+          'Content-Type':
+            'application/x-www-form-urlencoded;charset=UTF-8'
+        },
+        body:encodedBody,
+        keepalive:false
+      }).catch(() => {
+        postPayloadFallback_(payload);
+      });
+
+      return;
+
+    } catch (_) {
+      postPayloadFallback_(payload);
+    }
+  }
+
+
+  function postPayloadFallback_(payload) {
+    const frameName =
+      '__bitacoraPost_' +
+      Date.now() +
+      '_' +
+      Math.random().toString(36).slice(2);
+
+    const frame = document.createElement('iframe');
+    frame.name = frameName;
+    frame.style.display = 'none';
+
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = BACKEND_URL;
-    form.target = 'resultFrame';
-    form.enctype = 'application/x-www-form-urlencoded';
+    form.target = frameName;
+    form.enctype =
+      'application/x-www-form-urlencoded';
     form.style.display = 'none';
 
     const input = document.createElement('textarea');
@@ -1466,12 +1511,15 @@
     input.value = JSON.stringify(payload);
 
     form.appendChild(input);
+    document.body.appendChild(frame);
     document.body.appendChild(form);
+
     form.submit();
 
     setTimeout(() => {
       try { form.remove(); } catch (_) {}
-    }, 5000);
+      try { frame.remove(); } catch (_) {}
+    }, 60000);
   }
 
 
