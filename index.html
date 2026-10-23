@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V3.2.0 POST FIX</title>
+  <title>Reporte de supervisión · V3.2.0 ESTABLE FIX</title>
 
   <style>
     :root {
@@ -344,7 +344,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 3.2.0 · POST FIX</div>
+    <div class="hint">Versión 3.2.0 · ESTABLE FIX</div>
 
     <p class="lead">
       Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
@@ -1654,31 +1654,44 @@
     timeoutMs,
     timeoutMessage
   ) {
-    let attempts = 0;
+    const startedAt = Date.now();
 
     while (true) {
-      try {
-        const status = await getSubmissionStatus_(submissionId);
+      const status = await getSubmissionStatus_(
+        submissionId
+      );
 
-        if (predicate(status)) {
-          return status;
-        }
-      } catch (_) {
-        // Reintenta indefinidamente: los problemas de red no cancelan el proceso.
+      if (
+        status &&
+        (
+          status.status === 'error' ||
+          status.errorMessage
+        )
+      ) {
+        throw new Error(
+          status.errorMessage ||
+          'El servidor informó un error al procesar la visita.'
+        );
       }
 
-      attempts++;
+      if (predicate(status)) {
+        return status;
+      }
 
-      if (attempts % 15 === 0) {
-        showStatus(
-          'El proceso continúa. No cierres la página; seguiremos esperando la confirmación del servidor.',
-          'busy'
+      if (
+        timeoutMs &&
+        Date.now() - startedAt >= timeoutMs
+      ) {
+        throw new Error(
+          timeoutMessage ||
+          'El servidor no confirmó el proceso.'
         );
       }
 
       await wait_(2000);
     }
   }
+
 
   function wait_(milliseconds) {
     return new Promise(resolve => setTimeout(resolve, milliseconds));
