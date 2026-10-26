@@ -3,197 +3,2891 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión</title>
+  <title>Reporte de supervisión · V3.2.0</title>
+
   <style>
-    :root { --ink:#17211d; --muted:#66736d; --green:#174c3c; --orange:#e87824; --paper:#fff; --bg:#f2f5f3; --danger:#a92f2f; }
+    :root {
+      --ink:#263238;
+      --muted:#607d8b;
+      --dark:#315b6b;
+      --mid:#b8ddea;
+      --light:#dceff7;
+      --paper:#ffffff;
+      --bg:#f6fafc;
+      --danger:#a92f2f;
+      --border:#c9dce4;
+    }
+
     * { box-sizing:border-box; }
-    body { margin:0; font-family:Arial,sans-serif; color:var(--ink); background:var(--bg); }
-    main { max-width:680px; margin:auto; padding:20px 16px 48px; }
-    .card { background:var(--paper); border-radius:18px; padding:22px; box-shadow:0 8px 30px rgba(23,76,60,.10); }
-    h1 { margin:0 0 6px; font-size:26px; }
-    .lead { margin:0 0 22px; color:var(--muted); line-height:1.45; }
-    label { display:block; margin:16px 0 7px; font-weight:700; }
-    input,textarea,button { width:100%; font:inherit; }
-    input,textarea { border:1px solid #cdd6d1; border-radius:11px; padding:13px; background:white; }
-    textarea { min-height:90px; resize:vertical; }
-    button { border:0; border-radius:12px; padding:14px 16px; font-weight:700; cursor:pointer; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-    .record { background:var(--green); color:white; margin-top:8px; }
-    .record.active { background:var(--danger); }
-    .submit { background:var(--orange); color:white; margin-top:22px; }
-    .secondary { background:#e8eeeb; color:var(--ink); margin-top:8px; }
-    .timer { text-align:center; font-size:26px; font-variant-numeric:tabular-nums; margin:14px 0 4px; }
-    .hint,.status { color:var(--muted); font-size:14px; line-height:1.4; }
-    .status { padding:12px; margin-top:16px; border-radius:10px; background:#eef4f1; display:none; }
-    .status.error { display:block; color:#8b2222; background:#fdeeee; }
-    .status.ok { display:block; color:#15513c; background:#e8f6ef; }
-    .status.busy { display:block; color:#67410c; background:#fff4dc; }
-    .photo-list { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
-    .photo-list img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; }
+
+    body {
+      margin:0;
+      font-family:Arial,sans-serif;
+      color:var(--ink);
+      background:var(--bg);
+    }
+
+    main {
+      max-width:680px;
+      margin:auto;
+      padding:20px 16px 48px;
+    }
+
+    .card {
+      background:var(--paper);
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:22px;
+      box-shadow:0 8px 30px rgba(49,91,107,.10);
+    }
+
+    h1 {
+      margin:0 0 6px;
+      color:var(--dark);
+      font-size:26px;
+    }
+
+    .lead {
+      margin:0 0 22px;
+      color:var(--muted);
+      line-height:1.45;
+    }
+
+    label {
+      display:block;
+      margin:16px 0 7px;
+      font-weight:700;
+    }
+
+    input, select, textarea, button {
+      width:100%;
+      font:inherit;
+    }
+
+    input, select, textarea {
+      border:1px solid var(--border);
+      border-radius:11px;
+      padding:13px;
+      background:white;
+    }
+
+    textarea {
+      min-height:90px;
+      resize:vertical;
+    }
+
+    button {
+      border:0;
+      border-radius:12px;
+      padding:14px 16px;
+      font-weight:700;
+      cursor:pointer;
+    }
+
+    button:disabled {
+      opacity:.5;
+      cursor:not-allowed;
+    }
+
+    .record {
+      background:var(--dark);
+      color:white;
+      margin-top:8px;
+    }
+
+    .record.active {
+      background:var(--danger);
+    }
+
+    .submit {
+      background:var(--mid);
+      color:var(--ink);
+      margin-top:22px;
+    }
+
+    .secondary {
+      background:var(--light);
+      color:var(--ink);
+      margin-top:8px;
+    }
+
+    #photoSubmitButton {
+      margin-top:10px;
+      border:1px solid var(--border);
+    }
+
+    #photoSubmitButton:not(:disabled) {
+      background:var(--dark);
+      color:white;
+    }
+
+    .mode-title {
+      margin-top:22px;
+      padding:11px 13px;
+      border-radius:10px;
+      background:#eef8fc;
+      color:var(--dark);
+      font-size:13px;
+      font-weight:800;
+      letter-spacing:.02em;
+      border-left:4px solid var(--dark);
+    }
+
+    .mode-title span {
+      display:block;
+      margin-top:3px;
+      color:var(--muted);
+      font-size:12px;
+      font-weight:400;
+      letter-spacing:0;
+    }
+
+    .mode-title.photo-mode {
+      margin-top:26px;
+      background:#f4fbfe;
+    }
+
+    .photo-progress-wrap {
+      margin-top:14px;
+      padding:13px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#f8fcfe;
+    }
+
+    .photo-progress-head {
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      margin-bottom:8px;
+      font-size:14px;
+    }
+
+    .photo-progress-track {
+      width:100%;
+      height:14px;
+      border-radius:999px;
+      overflow:hidden;
+      background:#dceff7;
+    }
+
+    .photo-progress-bar {
+      width:0%;
+      height:100%;
+      background:var(--dark);
+      transition:width .25s ease;
+    }
+
+    .visit-picker {
+      margin-top:10px;
+      padding:14px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#f8fcfe;
+    }
+
+    .visit-picker label {
+      margin-top:0;
+    }
+
+    .visit-picker-grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      margin-bottom:8px;
+    }
+
+    .visit-picker-grid .secondary {
+      margin-top:0;
+    }
+
+    @media (max-width:480px) {
+      .visit-picker-grid {
+        grid-template-columns:1fr;
+      }
+    }
+
+    .timer {
+      text-align:center;
+      font-size:26px;
+      font-variant-numeric:tabular-nums;
+      margin:14px 0 4px;
+    }
+
+    .hint, .status {
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.4;
+    }
+
+    .status {
+      padding:12px;
+      margin-top:16px;
+      border-radius:10px;
+      display:none;
+    }
+
+    .status.error {
+      display:block;
+      color:#8b2222;
+      background:#fdeeee;
+    }
+
+    .status.ok {
+      display:block;
+      color:#15513c;
+      background:#e8f6ef;
+    }
+
+    .status.busy {
+      display:block;
+      color:var(--dark);
+      background:var(--light);
+    }
+
+    .photo-list {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+      margin-top:10px;
+    }
+
+    .photo-card {
+      position:relative;
+      overflow:hidden;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:var(--paper);
+    }
+
+    .photo-card img {
+      display:block;
+      width:100%;
+      aspect-ratio:1;
+      object-fit:cover;
+    }
+
+    .photo-remove {
+      position:absolute;
+      top:6px;
+      right:6px;
+      width:30px;
+      height:30px;
+      padding:0;
+      border-radius:999px;
+      color:white;
+      background:rgba(169,47,47,.92);
+      font-size:18px;
+      line-height:30px;
+    }
+
+    .photo-meta {
+      padding:7px 8px;
+      color:var(--muted);
+      font-size:12px;
+      text-align:center;
+    }
+
+    .photo-toolbar {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-top:10px;
+    }
+
+    .photo-toolbar .secondary {
+      width:auto;
+      margin-top:0;
+      padding:9px 12px;
+    }
+
+    .process-summary {
+      display:none;
+      margin-top:14px;
+      padding:14px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#f8fcfe;
+      line-height:1.55;
+      font-size:14px;
+    }
+
+    .process-summary.show {
+      display:block;
+    }
+
+    .repair {
+      display:none;
+      margin-top:10px;
+      background:#fff3cd;
+      color:#6b5200;
+      border:1px solid #ead28a;
+    }
+
+    .repair.show {
+      display:block;
+    }
+
     iframe { display:none; }
-    @media (max-width:480px) { .card{padding:18px;} h1{font-size:23px;} }
+
+    @media (max-width:480px) {
+      .card { padding:18px; }
+      h1 { font-size:23px; }
+    }
   </style>
 </head>
+
 <body>
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <p class="lead">Graba un audio explicando la visita y adjunta las fotografías necesarias.</p>
+    <div class="hint">Versión 3.2.0</div>
+
+    <p class="lead">
+      Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
+    </p>
 
     <label for="accessCode">Código de acceso</label>
-    <input id="accessCode" type="password" autocomplete="off" required>
+    <input id="accessCode" type="password" inputmode="numeric" autocomplete="off" required>
 
     <label for="project">Proyecto</label>
-    <input id="project" list="projectList" placeholder="Escribe o selecciona el proyecto" required>
-    <datalist id="projectList"><option value="Proyecto de prueba"></datalist>
+    <select id="project" required>
+      <option value="">Cargando proyectos…</option>
+    </select>
+
+    <div class="mode-title">
+      MODO A · NUEVO REPORTE
+      <span>Audio → transcripción → documento</span>
+    </div>
 
     <label>Audio de la visita</label>
-    <button id="recordButton" class="record" type="button">Iniciar grabación</button>
+
+    <button id="recordButton" class="record" type="button">
+      Iniciar grabación
+    </button>
+
     <div id="timer" class="timer">00:00</div>
+
     <audio id="preview" controls hidden style="width:100%;margin-top:10px"></audio>
-    <button id="discardButton" class="secondary" type="button" hidden>Descartar audio</button>
-    <p class="hint">Menciona trabajos observados, problemas, correcciones, responsables, fechas y seguimiento anterior.</p>
-    <input id="audioFallback" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.webm" hidden>
-    <button id="fallbackButton" class="secondary" type="button">O adjuntar un audio existente</button>
+
+    <button id="discardButton" class="secondary" type="button" hidden>
+      Descartar audio
+    </button>
+
+    <p class="hint">
+      Menciona trabajos observados, problemas, correcciones, responsables,
+      fechas y seguimiento anterior.
+    </p>
+
+    <input
+      id="audioFallback"
+      type="file"
+      accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.webm"
+      hidden>
+
+    <button id="fallbackButton" class="secondary" type="button">
+      O adjuntar un audio existente
+    </button>
+
+    <div class="mode-title photo-mode">
+      MODO B · SOLO FOTOGRAFÍAS
+      <span>No requiere grabar ni procesar audio nuevamente</span>
+    </div>
+
+    <div class="visit-picker">
+      <label for="visitDate">Seleccionar bitácora existente por fecha</label>
+
+      <div class="visit-picker-grid">
+        <input id="visitDate" type="date">
+        <button id="loadVisitsButton" class="secondary" type="button">
+          Buscar bitácoras del día
+        </button>
+      </div>
+
+      <select id="visitSelect">
+        <option value="">Busca una fecha y selecciona la bitácora</option>
+      </select>
+
+      <div id="visitPhotoInfo" class="hint"></div>
+
+      <button id="recoverDrivePhotosButton"
+              class="repair"
+              type="button">
+        Recuperar fotografías pendientes de Drive
+      </button>
+    </div>
 
     <label for="photos">Fotografías</label>
+
     <input id="photos" type="file" accept="image/*" multiple>
+
+    <div class="photo-toolbar">
+      <span id="photoCount" class="hint">Fotos seleccionadas: 0 / 12</span>
+      <button id="clearPhotosButton" class="secondary" type="button" hidden>
+        Quitar todas
+      </button>
+    </div>
+
     <div id="photoList" class="photo-list"></div>
-    <p class="hint">Máximo 6 fotografías. Puedes usar cámara o galería.</p>
+
+    <p class="hint">
+      Puedes seleccionar de 1 a 12 fotografías por carga. Se suben una por una para evitar fallos y verás el avance en pantalla. Puedes volver después y agregar más a la misma bitácora. Las repetidas se omiten automáticamente.
+    </p>
 
     <label for="note">Nota adicional (opcional)</label>
-    <textarea id="note" placeholder="Por ejemplo: dar prioridad al baño principal."></textarea>
 
-    <button id="submitButton" class="submit" type="button">Enviar y crear bitácora</button>
+    <textarea
+      id="note"
+      placeholder="Por ejemplo: dar prioridad al baño principal."></textarea>
+
+    <button id="submitButton" class="submit" type="button">
+      Procesar audio y generar documento
+    </button>
+
+    <p class="hint photo-only-note">
+      Para subir solo fotografías: busca la fecha, selecciona la bitácora y elige las imágenes. No necesitas usar el botón de audio.
+    </p>
+
+    <div id="photoProgressWrap" class="photo-progress-wrap" hidden>
+      <div class="photo-progress-head">
+        <span id="photoProgressText">Preparando fotografías…</span>
+        <strong id="photoProgressCount">0 / 0</strong>
+      </div>
+
+      <div class="photo-progress-track">
+        <div id="photoProgressBar" class="photo-progress-bar"></div>
+      </div>
+
+      <div id="photoProgressDetail" class="hint"></div>
+    </div>
+
+    <button id="photoSubmitButton" class="secondary" type="button" disabled>
+      Subir solo fotografías a esta bitácora
+    </button>
+
     <div id="status" class="status"></div>
+
+    <div id="processSummary" class="process-summary"></div>
+
+    <button id="repairButton" class="repair" type="button">
+      Reparar fotografías pendientes en el documento
+    </button>
   </section>
 </main>
-<iframe name="resultFrame" id="resultFrame"></iframe>
+
+<iframe id="resultFrame" name="resultFrame" title="Respuesta del servidor"></iframe>
+
 <script>
-  const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbx7BOM4l0iO9ZvjGhAT3Hx61Mk9GvrGSLwplx3yJTNtTs4BI1xQZIub9cLdf-ubOjoN/exec';
+  const BACKEND_URL =
+    'https://script.google.com/macros/s/AKfycbx7BOM4l0iO9ZvjGhAT3Hx61Mk9GvrGSLwplx3yJTNtTs4BI1xQZIub9cLdf-ubOjoN/exec';
+
   const MAX_AUDIO_MINUTES = 8;
-  const MAX_IMAGES = 6;
-  const state = { recorder:null, stream:null, chunks:[], audioBlob:null, audioMime:'', startedAt:0, timer:null, photos:[] };
+  const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
+  const MAX_IMAGES = 12;
+  const RESPONSE_TIMEOUT_MS = 8 * 60 * 1000;
+
+  const state = {
+    recorder:null,
+    stream:null,
+    chunks:[],
+    audioBlob:null,
+    audioMime:'',
+    startedAt:0,
+    timer:null,
+    photos:[],
+    submitForm:null,
+    responseTimeout:null,
+    activeSubmissionId:'',
+    uploadedBatchIndexes:new Set(),
+    lastPhotoSignature:'',
+    lastServerStatus:null,
+    repairSubmissionId:'',
+    selectedVisitId:'',
+    selectedVisitInfo:null,
+    orphanPhotoCount:0,
+    currentVisits:[]
+  };
+
   const $ = id => document.getElementById(id);
 
-  $('recordButton').addEventListener('click', async () => {
-    if (state.recorder && state.recorder.state === 'recording') return stopRecording();
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      return showError('Este navegador no permite grabar directamente. Usa la opción de adjuntar audio.');
+  window.receiveBitacoraConfig = function(config) {
+    const projects = Array.isArray(config && config.projects)
+      ? config.projects
+      : [];
+
+    $('project').innerHTML =
+      '<option value="">Selecciona un proyecto</option>' +
+      projects.map(project => {
+        const name = typeof project === 'string'
+          ? project
+          : String(project.name || '');
+
+        return '<option value="' + escapeHtml(name) + '">' +
+          escapeHtml(name) +
+          '</option>';
+      }).join('');
+
+    if (!projects.length) {
+      showError('No hay proyectos activos disponibles.');
     }
+  };
+
+  loadProjects();
+  $('visitDate').value = new Date().toISOString().slice(0, 10);
+
+  function loadProjects() {
+    const script = document.createElement('script');
+
+    script.src =
+      BACKEND_URL +
+      '?page=config&callback=receiveBitacoraConfig&t=' +
+      Date.now();
+
+    script.onerror = () => {
+      $('project').innerHTML =
+        '<option value="">No disponible temporalmente</option>';
+
+      showStatus(
+        'No se pudo cargar la lista de proyectos para crear un reporte nuevo. ' +
+        'El modo “Solo fotografías” sigue disponible: busca la bitácora por fecha.',
+        'busy'
+      );
+    };
+
+    document.head.appendChild(script);
+  }
+
+  $('recordButton').addEventListener('click', async () => {
+    if (state.recorder && state.recorder.state === 'recording') {
+      stopRecording();
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      showError(
+        'Este navegador no permite grabar directamente. ' +
+        'Utiliza la opción de adjuntar un audio existente.'
+      );
+      return;
+    }
+
     try {
       state.stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-      const preferred = ['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus'];
-      state.audioMime = preferred.find(t => MediaRecorder.isTypeSupported(t)) || '';
+
+      const preferredTypes = [
+        'audio/mp4',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus'
+      ];
+
+      state.audioMime =
+        preferredTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
+
       state.chunks = [];
-      state.recorder = new MediaRecorder(state.stream, state.audioMime ? { mimeType:state.audioMime } : undefined);
-      state.recorder.ondataavailable = e => { if (e.data.size) state.chunks.push(e.data); };
+
+      state.recorder = new MediaRecorder(
+        state.stream,
+        state.audioMime ? { mimeType:state.audioMime } : undefined
+      );
+
+      state.recorder.ondataavailable = event => {
+        if (event.data && event.data.size > 0) {
+          state.chunks.push(event.data);
+        }
+      };
+
       state.recorder.onstop = finishRecording;
       state.recorder.start(1000);
       state.startedAt = Date.now();
+
+      clearInterval(state.timer);
       state.timer = setInterval(updateTimer, 250);
+
       $('recordButton').textContent = 'Detener grabación';
       $('recordButton').classList.add('active');
+
       showStatus('Grabando…', 'busy');
-      setTimeout(() => { if (state.recorder?.state === 'recording') stopRecording(); }, MAX_AUDIO_MINUTES * 60000);
+
+      setTimeout(() => {
+        if (state.recorder?.state === 'recording') {
+          stopRecording();
+        }
+      }, MAX_AUDIO_MINUTES * 60 * 1000);
+
     } catch (error) {
-      showError('No fue posible usar el micrófono. Revisa el permiso del navegador. Detalle: ' + (error.message || error));
+      showError(
+        'No fue posible utilizar el micrófono. Revisa el permiso del navegador. ' +
+        getErrorMessage(error)
+      );
     }
   });
 
-  function stopRecording() { if (state.recorder?.state === 'recording') state.recorder.stop(); }
+  function stopRecording() {
+    if (state.recorder?.state === 'recording') {
+      state.recorder.stop();
+    }
+  }
+
   function finishRecording() {
     clearInterval(state.timer);
-    state.stream?.getTracks().forEach(t => t.stop());
-    state.audioMime = state.recorder.mimeType || state.audioMime || 'audio/webm';
+    state.stream?.getTracks().forEach(track => track.stop());
+
+    state.audioMime =
+      state.recorder?.mimeType ||
+      state.audioMime ||
+      'audio/webm';
+
     state.audioBlob = new Blob(state.chunks, { type:state.audioMime });
+
+    if (!state.audioBlob.size) {
+      showError('La grabación quedó vacía. Intenta nuevamente.');
+      return;
+    }
+
+    if (state.audioBlob.size > MAX_AUDIO_BYTES) {
+      resetAudio();
+      showError('El audio excede el límite de 15 MB.');
+      return;
+    }
+
     $('preview').src = URL.createObjectURL(state.audioBlob);
     $('preview').hidden = false;
     $('discardButton').hidden = false;
     $('recordButton').textContent = 'Grabar nuevamente';
     $('recordButton').classList.remove('active');
+
     showStatus('Audio listo para enviar.', 'ok');
   }
 
   $('discardButton').addEventListener('click', resetAudio);
+
   function resetAudio() {
     state.audioBlob = null;
+    state.audioMime = '';
+    state.chunks = [];
+
+    $('preview').removeAttribute('src');
+    $('preview').load();
     $('preview').hidden = true;
     $('discardButton').hidden = true;
+    $('audioFallback').value = '';
     $('timer').textContent = '00:00';
+    $('recordButton').textContent = 'Iniciar grabación';
+    $('recordButton').classList.remove('active');
   }
 
-  $('fallbackButton').addEventListener('click', () => $('audioFallback').click());
-  $('audioFallback').addEventListener('change', e => {
-    const file = e.target.files[0];
+  $('fallbackButton').addEventListener('click', () => {
+    $('audioFallback').click();
+  });
+
+  $('audioFallback').addEventListener('change', event => {
+    const file = event.target.files?.[0];
+
     if (!file) return;
+
+    if (file.size > MAX_AUDIO_BYTES) {
+      $('audioFallback').value = '';
+      showError('El audio excede el límite de 15 MB.');
+      return;
+    }
+
     state.audioBlob = file;
     state.audioMime = file.type || 'audio/mpeg';
+
     $('preview').src = URL.createObjectURL(file);
     $('preview').hidden = false;
     $('discardButton').hidden = false;
+
     showStatus('Audio adjunto listo.', 'ok');
   });
 
-  $('photos').addEventListener('change', async e => {
-    const files = Array.from(e.target.files).slice(0, MAX_IMAGES);
-    state.photos = [];
-    $('photoList').innerHTML = '';
-    for (const file of files) {
-      const blob = await compressImage(file, 1600, .78);
-      state.photos.push(blob);
-      const img = document.createElement('img');
-      img.src = URL.createObjectURL(blob);
-      $('photoList').appendChild(img);
+  $('photos').addEventListener('change', async event => {
+    try {
+      const selectedFiles = Array.from(event.target.files || []);
+      const remainingSlots = MAX_IMAGES - state.photos.length;
+      const files = selectedFiles.slice(0, Math.max(0, remainingSlots));
+
+      if (!files.length && selectedFiles.length) {
+        showError('Ya alcanzaste el máximo de 12 fotografías.');
+        $('photos').value = '';
+        return;
+      }
+
+      showStatus(
+        'Preparando ' + files.length + ' fotografía' +
+        (files.length === 1 ? '' : 's') + '…',
+        'busy'
+      );
+
+      for (const file of files) {
+        const blob = await compressImage(file, 1280, .72);
+
+        state.photos.push({
+          id: crypto.randomUUID
+            ? crypto.randomUUID()
+            : String(Date.now()) + Math.random(),
+
+          blob:blob,
+          name:file.name || 'Fotografía',
+          hash:await hashBlob_(blob)
+        });
+      }
+
+      $('photos').value = '';
+      renderPhotos();
+
+      if (selectedFiles.length > files.length) {
+        showStatus(
+          'Se alcanzó el máximo de 12 fotografías. Las restantes no fueron agregadas.',
+          'busy'
+        );
+      } else {
+        showStatus(
+          'Fotografías listas para enviar.',
+          'ok'
+        );
+      }
+
+    } catch (error) {
+      showError(
+        'No se pudieron procesar las fotografías. ' +
+        getErrorMessage(error)
+      );
     }
   });
 
-  $('submitButton').addEventListener('click', async () => {
-    if (!$('accessCode').value.trim()) return showError('Ingresa el código de acceso.');
-    if (!$('project').value.trim()) return showError('Indica el proyecto.');
-    if (!state.audioBlob) return showError('Graba o adjunta un audio.');
-    setBusy(true);
-    try {
-      const images = [];
-      for (const blob of state.photos) images.push({ dataUrl:await blobToDataUrl(blob), mimeType:blob.type, caption:'' });
-      const payload = {
-        accessCode:$('accessCode').value.trim(), project:$('project').value.trim(), note:$('note').value.trim(),
-        audio:{ dataUrl:await blobToDataUrl(state.audioBlob), mimeType:state.audioMime || state.audioBlob.type || 'audio/webm' }, images
-      };
-      submitToBackend(JSON.stringify(payload));
-    } catch (error) { setBusy(false); showError(error); }
+  $('clearPhotosButton').addEventListener('click', () => {
+    state.photos = [];
+    renderPhotos();
+    showStatus(
+      'Se quitaron todas las fotografías seleccionadas.',
+      'ok'
+    );
   });
 
-  function submitToBackend(payload) {
-    const form = document.createElement('form');
-    form.method = 'POST'; form.action = BACKEND_URL; form.target = 'resultFrame'; form.style.display = 'none';
-    const input = document.createElement('textarea');
-    input.name = 'payload'; input.value = payload;
-    form.appendChild(input); document.body.appendChild(form); form.submit(); form.remove();
+  function removePhoto(photoId) {
+    state.photos =
+      state.photos.filter(item => item.id !== photoId);
+
+    renderPhotos();
+
+    showStatus(
+      'Fotografía eliminada de la selección.',
+      'ok'
+    );
   }
 
-  window.addEventListener('message', event => {
-    const data = event.data || {};
-    if (data.type !== 'bitacora-result') return;
-    setBusy(false);
-    if (!data.ok) return showError(data.message || 'No se pudo crear la bitácora.');
-    showStatus('Reporte creado correctamente. Ya puedes cerrar esta página.', 'ok');
-    resetAudio(); state.photos = []; $('photoList').innerHTML = ''; $('photos').value = ''; $('note').value = '';
+  function renderPhotos() {
+    const container = $('photoList');
+
+    container.innerHTML = '';
+
+    $('photoCount').textContent =
+      'Fotos seleccionadas: ' +
+      state.photos.length +
+      ' / ' +
+      MAX_IMAGES;
+
+    $('clearPhotosButton').hidden =
+      state.photos.length === 0;
+
+    state.photos.forEach((item, index) => {
+      const card = document.createElement('div');
+      card.className = 'photo-card';
+
+      const image = document.createElement('img');
+      image.src = URL.createObjectURL(item.blob);
+      image.alt =
+        'Fotografía seleccionada ' + (index + 1);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'photo-remove';
+
+      remove.setAttribute(
+        'aria-label',
+        'Eliminar fotografía ' + (index + 1)
+      );
+
+      remove.textContent = '×';
+
+      remove.addEventListener(
+        'click',
+        () => removePhoto(item.id)
+      );
+
+      const meta = document.createElement('div');
+      meta.className = 'photo-meta';
+
+      meta.textContent =
+        'Foto ' +
+        (index + 1) +
+        ' · ' +
+        (item.blob.size / (1024 * 1024)).toFixed(2) +
+        ' MB';
+
+      card.appendChild(image);
+      card.appendChild(remove);
+      card.appendChild(meta);
+
+      container.appendChild(card);
+    });
+  }
+
+  async function hashBlob_(blob) {
+    if (!window.crypto || !crypto.subtle) {
+      return '';
+    }
+
+    const buffer = await blob.arrayBuffer();
+
+    const digest =
+      await crypto.subtle.digest(
+        'SHA-256',
+        buffer
+      );
+
+    return Array
+      .from(new Uint8Array(digest))
+      .map(
+        byte =>
+          byte
+            .toString(16)
+            .padStart(2, '0')
+      )
+      .join('');
+  }
+
+  $('submitButton').addEventListener('click', async () => {
+    const accessCode =
+      $('accessCode').value.trim();
+
+    const project =
+      $('project').value.trim();
+
+    if (!accessCode) {
+      return showError(
+        'Ingresa el código de acceso.'
+      );
+    }
+
+    if (!project) {
+      return showError(
+        'Selecciona el proyecto.'
+      );
+    }
+
+    if (
+      !state.audioBlob &&
+      !state.activeSubmissionId
+    ) {
+      return showError(
+        'Graba o adjunta un audio.'
+      );
+    }
+
+    $('submitButton').disabled = true;
+
+    try {
+      if (!state.activeSubmissionId) {
+        state.activeSubmissionId =
+          createSubmissionId_();
+      }
+
+      state.selectedVisitId =
+        state.activeSubmissionId;
+
+      $('visitSelect').innerHTML =
+        '<option value="' +
+        escapeHtml(state.activeSubmissionId) +
+        '">' +
+        'Visita actual · procesando audio/documento' +
+        '</option>';
+
+      $('visitSelect').value =
+        state.activeSubmissionId;
+
+      showStatus(
+        'Paso 1 iniciado: audio enviado para transcripción y generación del documento. Ya puedes continuar con las fotografías.',
+        'busy'
+      );
+
+      postPayload_({
+        action:'start',
+        accessCode,
+        submissionId:
+          state.activeSubmissionId,
+        project,
+        note:
+          $('note').value.trim(),
+        expectedPhotoCount:
+          state.photos.length,
+        audio:{
+          dataUrl:
+            await blobToDataUrl(
+              state.audioBlob
+            ),
+
+          mimeType:
+            state.audioMime ||
+            state.audioBlob.type ||
+            'audio/webm'
+        }
+      });
+
+      $('photoSubmitButton').disabled = false;
+
+      showStatus(
+        '✓ Audio enviado. La transcripción y el documento siguen procesándose. Puedes subir las fotografías desde ahora.',
+        'ok'
+      );
+
+      monitorDocumentInBackground_(
+        state.activeSubmissionId
+      );
+
+    } catch (error) {
+      $('submitButton').disabled = false;
+
+      showError(
+        getErrorMessage(error)
+      );
+    }
   });
+
+  async function monitorDocumentInBackground_(
+    submissionId
+  ) {
+    try {
+      const status =
+        await waitForServer_(
+          submissionId,
+
+          result =>
+            result.exists &&
+            (
+              (
+                result.process &&
+                result.process.documentGenerated === true
+              ) ||
+              (
+                result.result &&
+                result.result.docUrl
+              )
+            ),
+
+          5 * 60 * 1000,
+
+          'El documento continúa procesándose.'
+        );
+
+      updateProcessSummary_(status);
+
+      const process =
+        status.process || {};
+
+      if (
+        Number(
+          process.photosPendingDocument || 0
+        ) > 0 &&
+        process.repairAvailable
+      ) {
+        $('repairButton')
+          .classList
+          .add('show');
+      }
+
+    } catch (_) {}
+  }
+
+  $('loadVisitsButton').addEventListener(
+    'click',
+    async () => {
+      const accessCode =
+        $('accessCode').value.trim();
+
+      const project =
+        $('project').value.trim();
+
+      const date =
+        $('visitDate').value;
+
+      if (!accessCode) {
+        return showError(
+          'Ingresa el código de acceso.'
+        );
+      }
+
+      if (!date) {
+        return showError(
+          'Selecciona la fecha de la bitácora.'
+        );
+      }
+
+      showStatus(
+        'Buscando bitácoras del día…',
+        'busy'
+      );
+
+      try {
+        const response =
+          await loadVisits_(
+            accessCode,
+            project,
+            date
+          );
+
+        let visits =
+          Array.isArray(response.visits)
+            ? response.visits.slice()
+            : [];
+
+        if (
+          state.activeSubmissionId &&
+          !visits.some(
+            visit =>
+              visit.submissionId ===
+              state.activeSubmissionId
+          )
+        ) {
+          try {
+            const currentStatus =
+              await getSubmissionStatus_(
+                state.activeSubmissionId
+              );
+
+            if (
+              currentStatus &&
+              currentStatus.exists &&
+              currentStatus.result &&
+              currentStatus.result.docUrl
+            ) {
+              const currentDate =
+                new Date()
+                  .toISOString()
+                  .slice(0, 10);
+
+              if (
+                !date ||
+                date === currentDate
+              ) {
+                const p =
+                  currentStatus.process || {};
+
+                visits.unshift({
+                  submissionId:
+                    state.activeSubmissionId,
+
+                  projectName:
+                    project ||
+                    'Proyecto actual',
+
+                  date:
+                    currentDate,
+
+                  createdAt:
+                    new Date()
+                      .toISOString(),
+
+                  visitNumber:
+                    currentStatus
+                      .result
+                      .visitNumber ||
+                    '',
+
+                  reportNumber:
+                    currentStatus
+                      .result
+                      .reportNumber ||
+                    '',
+
+                  docUrl:
+                    currentStatus
+                      .result
+                      .docUrl ||
+                    '',
+
+                  status:
+                    currentStatus
+                      .status ||
+                    '',
+
+                  photosSaved:
+                    Number(
+                      p.photosSaved || 0
+                    ),
+
+                  photosInserted:
+                    Number(
+                      p.photosInserted || 0
+                    ),
+
+                  documentGenerated:
+                    true
+                });
+              }
+            }
+          } catch (_) {}
+        }
+
+        state.currentVisits =
+          visits;
+
+        if (!visits.length) {
+          $('visitSelect').innerHTML =
+            '<option value="">No se encontraron bitácoras para esa fecha</option>';
+
+          $('visitPhotoInfo').textContent = '';
+
+          showStatus(
+            'No se encontró ninguna visita con esa fecha dentro del documento mensual ni en las sesiones registradas.',
+            'ok'
+          );
+
+          return;
+        }
+
+        $('visitSelect').innerHTML =
+          visits
+            .map(visit => {
+              const label =
+                (
+                  visit.projectName
+                    ? visit.projectName +
+                      ' · '
+                    : ''
+                ) +
+
+                'Visita ' +
+
+                (
+                  visit.visitNumber ||
+                  'sin número'
+                ) +
+
+                ' · Fotos en documento: ' +
+
+                Number(
+                  visit.photosInserted ||
+                  0
+                ) +
+
+                (
+                  Number(
+                    visit.orphanPhotoCount ||
+                    0
+                  ) > 0
+
+                    ? ' · Pendientes en Drive: ' +
+                      Number(
+                        visit.orphanPhotoCount ||
+                        0
+                      )
+
+                    : ''
+                );
+
+              return (
+                '<option value="' +
+                escapeHtml(
+                  visit.submissionId
+                ) +
+                '">' +
+                escapeHtml(label) +
+                '</option>'
+              );
+            })
+            .join('');
+
+        state.selectedVisitId =
+          visits[0].submissionId;
+
+        state.selectedVisitInfo =
+          visits[0];
+
+        updateSelectedVisitInfo_(
+          visits[0]
+        );
+
+        $('photoSubmitButton').disabled =
+          false;
+
+        showStatus(
+          'Bitácoras encontradas. Selecciona la visita; puedes subir fotografías sin procesar audio.',
+          'ok'
+        );
+
+      } catch (error) {
+        $('visitSelect').innerHTML =
+          '<option value="">No se pudo actualizar la lista</option>';
+
+        showError(
+          'No se pudieron cargar las bitácoras: ' +
+          getErrorMessage(error)
+        );
+      }
+    }
+  );
+
+  $('visitSelect')
+    .addEventListener(
+      'change',
+      async () => {
+        const submissionId =
+          $('visitSelect').value;
+
+        state.selectedVisitId =
+          submissionId;
+
+        if (!submissionId) {
+          $('visitPhotoInfo').textContent =
+            '';
+
+          $('recoverDrivePhotosButton')
+            .classList
+            .remove('show');
+
+          return;
+        }
+
+        const knownVisit =
+          (state.currentVisits || [])
+            .find(
+              visit =>
+                visit.submissionId ===
+                submissionId
+            );
+
+        if (knownVisit) {
+          state.selectedVisitInfo =
+            knownVisit;
+
+          updateSelectedVisitInfo_(
+            knownVisit
+          );
+
+          $('photoSubmitButton')
+            .disabled =
+            false;
+
+          return;
+        }
+
+        try {
+          const status =
+            await getSubmissionStatus_(
+              submissionId
+            );
+
+          const process =
+            status.process || {};
+
+          state.selectedVisitInfo = {
+            submissionId,
+
+            photosSaved:
+              Number(
+                process.photosSaved ||
+                0
+              ),
+
+            photosInserted:
+              Number(
+                process.photosInserted ||
+                0
+              ),
+
+            orphanPhotoCount:0
+          };
+
+          updateSelectedVisitInfo_(
+            state.selectedVisitInfo
+          );
+
+          $('photoSubmitButton')
+            .disabled =
+            false;
+
+        } catch (_) {}
+      }
+    );
+
+  async function refreshSelectedVisitInfo_(
+    submissionId
+  ) {
+    try {
+      const status =
+        await getSubmissionStatus_(
+          submissionId
+        );
+
+      const process =
+        status.process || {};
+
+      updateSelectedVisitInfo_({
+        photosSaved:
+          Number(
+            process.photosSaved ||
+            0
+          ),
+
+        photosInserted:
+          Number(
+            process.photosInserted ||
+            0
+          )
+      });
+
+    } catch (_) {}
+  }
+
+  function updateSelectedVisitInfo_(visit) {
+    const saved =
+      Number(
+        visit.photosSaved ||
+        0
+      );
+
+    const inserted =
+      Number(
+        visit.photosInserted ||
+        0
+      );
+
+    const orphan =
+      Number(
+        visit.orphanPhotoCount ||
+        0
+      );
+
+    state.orphanPhotoCount =
+      orphan;
+
+    let text =
+      'Esta bitácora tiene ' +
+      inserted +
+      ' fotografía' +
+      (
+        inserted === 1
+          ? ''
+          : 's'
+      ) +
+      ' en el documento';
+
+    if (saved > inserted) {
+      text +=
+        ' y ' +
+        (saved - inserted) +
+        ' pendiente(s) ya asociada(s) en Drive';
+    }
+
+    text += '.';
+
+    if (orphan > 0) {
+      text +=
+        ' Además, se encontraron ' +
+        orphan +
+        ' fotografía(s) de esta fecha en Drive que todavía no están asociadas a la bitácora.';
+    }
+
+    text +=
+      ' Puedes agregar fotografías directamente a esta bitácora sin audio. ' +
+      'Las repetidas se detectan y no se vuelven a cargar.';
+
+    $('visitPhotoInfo').textContent =
+      text;
+
+    if (orphan > 0) {
+      $('recoverDrivePhotosButton')
+        .classList
+        .add('show');
+
+      $('recoverDrivePhotosButton')
+        .textContent =
+        'Recuperar ' +
+        orphan +
+        ' fotografía' +
+        (
+          orphan === 1
+            ? ''
+            : 's'
+        ) +
+        ' pendiente' +
+        (
+          orphan === 1
+            ? ''
+            : 's'
+        ) +
+        ' de Drive';
+
+    } else {
+      $('recoverDrivePhotosButton')
+        .classList
+        .remove('show');
+    }
+  }
+
+  function loadVisits_(
+    accessCode,
+    project,
+    date
+  ) {
+    return new Promise(
+      (resolve, reject) => {
+        const callbackName =
+          '__bitacoraVisits_' +
+          Date.now() +
+          '_' +
+          Math.random()
+            .toString(36)
+            .slice(2);
+
+        const script =
+          document
+            .createElement(
+              'script'
+            );
+
+        const cleanup = () => {
+          try {
+            delete window[
+              callbackName
+            ];
+          } catch (_) {}
+
+          try {
+            script.remove();
+          } catch (_) {}
+        };
+
+        window[callbackName] =
+          result => {
+            cleanup();
+
+            if (
+              !result ||
+              result.ok === false
+            ) {
+              reject(
+                new Error(
+                  result?.message ||
+                  'No se pudieron cargar las bitácoras.'
+                )
+              );
+
+              return;
+            }
+
+            resolve(result);
+          };
+
+        script.src =
+          BACKEND_URL +
+          '?page=visits' +
+          '&accessCode=' +
+          encodeURIComponent(
+            accessCode
+          ) +
+          '&project=' +
+          encodeURIComponent(
+            project
+          ) +
+          '&date=' +
+          encodeURIComponent(
+            date || ''
+          ) +
+          '&callback=' +
+          encodeURIComponent(
+            callbackName
+          ) +
+          '&t=' +
+          Date.now();
+
+        script.onerror = () => {
+          cleanup();
+
+          reject(
+            new Error(
+              'No se pudieron cargar las bitácoras.'
+            )
+          );
+        };
+
+        document
+          .head
+          .appendChild(
+            script
+          );
+      }
+    );
+  }
+
+  $('recoverDrivePhotosButton')
+    .addEventListener(
+      'click',
+      async () => {
+        const accessCode =
+          $('accessCode')
+            .value
+            .trim();
+
+        const submissionId =
+          $('visitSelect').value ||
+          state.selectedVisitId;
+
+        if (!accessCode) {
+          return showError(
+            'Ingresa el código de acceso.'
+          );
+        }
+
+        if (!submissionId) {
+          return showError(
+            'Selecciona primero la bitácora donde deseas recuperar las fotografías.'
+          );
+        }
+
+        $('recoverDrivePhotosButton')
+          .disabled =
+          true;
+
+        showStatus(
+          'Buscando fotografías de esa fecha en Drive e incorporándolas a la bitácora…',
+          'busy'
+        );
+
+        try {
+          postPayload_({
+            action:
+              'recover_date_photos',
+
+            accessCode,
+            submissionId
+          });
+
+          const previousOrphanCount =
+            Number(
+              state.orphanPhotoCount ||
+              0
+            );
+
+          const status =
+            await waitForServer_(
+              submissionId,
+
+              current => {
+                if (
+                  !current ||
+                  !current.exists
+                ) {
+                  return false;
+                }
+
+                const process =
+                  current.process ||
+                  {};
+
+                return (
+                  previousOrphanCount === 0 ||
+                  Number(
+                    process.photosSaved ||
+                    0
+                  ) > 0
+                );
+              },
+
+              0,
+              ''
+            );
+
+          updateProcessSummary_(
+            status
+          );
+
+          $('loadVisitsButton')
+            .click();
+
+          showStatus(
+            '✓ Recuperación terminada. Revisa el contador de fotografías de la bitácora.',
+            'ok'
+          );
+
+        } catch (error) {
+          showError(
+            getErrorMessage(error)
+          );
+
+        } finally {
+          $('recoverDrivePhotosButton')
+            .disabled =
+            false;
+        }
+      }
+    );
+
+  $('photoSubmitButton')
+    .addEventListener(
+      'click',
+      async () => {
+        const accessCode =
+          $('accessCode')
+            .value
+            .trim();
+
+        const targetSubmissionId =
+          $('visitSelect').value ||
+          state.selectedVisitId ||
+          state.activeSubmissionId;
+
+        if (!accessCode) {
+          return showError(
+            'Ingresa el código de acceso.'
+          );
+        }
+
+        if (!targetSubmissionId) {
+          return showError(
+            'Selecciona primero la bitácora a la que deseas agregar las fotografías.'
+          );
+        }
+
+        if (!state.photos.length) {
+          return showError(
+            'Selecciona al menos una fotografía.'
+          );
+        }
+
+        $('photoSubmitButton')
+          .disabled =
+          true;
+
+        $('photos')
+          .disabled =
+          true;
+
+        $('clearPhotosButton')
+          .disabled =
+          true;
+
+        const total =
+          state.photos.length;
+
+        let completed = 0;
+        let newPhotos = 0;
+        let duplicates = 0;
+        let insertedNow = 0;
+
+        $('photoProgressWrap')
+          .hidden =
+          false;
+
+        updatePhotoProgress_(
+          0,
+          total,
+          'Iniciando carga…'
+        );
+
+        try {
+          await waitForServer_(
+            targetSubmissionId,
+            status =>
+              status.exists ===
+              true,
+            0,
+            ''
+          );
+
+          for (
+            let index = 0;
+            index < state.photos.length;
+            index++
+          ) {
+            const item =
+              state.photos[index];
+
+            const operationId =
+              (
+                window.crypto &&
+                crypto.randomUUID
+              )
+
+                ? crypto.randomUUID()
+
+                : Date.now()
+                    .toString(36) +
+                  '-' +
+                  Math.random()
+                    .toString(36)
+                    .slice(2);
+
+            updatePhotoProgress_(
+              completed,
+              total,
+              'Subiendo fotografía ' +
+              (index + 1) +
+              ' de ' +
+              total +
+              '…'
+            );
+
+            postPayload_({
+              action:
+                'photo_single',
+
+              accessCode,
+
+              submissionId:
+                targetSubmissionId,
+
+              operationId,
+
+              photoIndex:
+                index + 1,
+
+              image:{
+                dataUrl:
+                  await blobToDataUrl(
+                    item.blob
+                  ),
+
+                mimeType:
+                  item.blob.type ||
+                  'image/jpeg',
+
+                caption:'',
+
+                hash:
+                  item.hash ||
+                  ''
+              }
+            });
+
+            const operationStatus =
+              await waitForPhotoOperation_(
+                operationId
+              );
+
+            if (
+              operationStatus.state ===
+              'error'
+            ) {
+              throw new Error(
+                operationStatus.message ||
+                'Falló la fotografía ' +
+                (index + 1) +
+                '.'
+              );
+            }
+
+            const result =
+              operationStatus.result ||
+              {};
+
+            if (result.duplicate) {
+              duplicates++;
+            } else {
+              newPhotos++;
+            }
+
+            if (result.inserted) {
+              insertedNow++;
+            }
+
+            completed++;
+
+            updatePhotoProgress_(
+              completed,
+              total,
+              completed === total
+                ? 'Carga de fotografías terminada.'
+                : 'Fotografía ' +
+                  completed +
+                  ' completada. Continuando…'
+            );
+          }
+
+          let status =
+            await getSubmissionStatus_(
+              targetSubmissionId
+            );
+
+          updateProcessSummary_(
+            status
+          );
+
+          await refreshSelectedVisitInfo_(
+            targetSubmissionId
+          );
+
+          const process =
+            status.process || {};
+
+          const saved =
+            Number(
+              process.photosSaved ||
+              0
+            );
+
+          const inserted =
+            Number(
+              process.photosInserted ||
+              0
+            );
+
+          if (
+            saved > inserted &&
+            (
+              process.documentGenerated ===
+                true ||
+              Boolean(
+                status.result &&
+                status.result.docUrl
+              )
+            )
+          ) {
+            $('photoProgressDetail')
+              .textContent =
+              'Todas las fotos ya están en Drive. Incorporando las pendientes al documento…';
+
+            postPayload_({
+              action:'repair',
+              accessCode,
+              submissionId:
+                targetSubmissionId
+            });
+
+            status =
+              await waitForServer_(
+                targetSubmissionId,
+
+                current =>
+                  current.exists &&
+                  current.process &&
+                  Number(
+                    current
+                      .process
+                      .photosPendingDocument ||
+                    0
+                  ) === 0,
+
+                0,
+                ''
+              );
+
+            updateProcessSummary_(
+              status
+            );
+
+            await refreshSelectedVisitInfo_(
+              targetSubmissionId
+            );
+          }
+
+          const finalProcess =
+            (
+              status &&
+              status.process
+            ) ||
+            {};
+
+          const finalSaved =
+            Number(
+              finalProcess.photosSaved ||
+              0
+            );
+
+          const finalInserted =
+            Number(
+              finalProcess.photosInserted ||
+              0
+            );
+
+          updatePhotoProgress_(
+            total,
+            total,
+            'Proceso finalizado.'
+          );
+
+          $('photoProgressDetail')
+            .textContent =
+            'Nuevas: ' +
+            newPhotos +
+            ' · Repetidas omitidas: ' +
+            duplicates +
+            ' · Total en Drive: ' +
+            finalSaved +
+            ' · Total en documento: ' +
+            finalInserted;
+
+          showStatus(
+            '✓ Fotografías procesadas correctamente. ' +
+            newPhotos +
+            ' nueva(s), ' +
+            duplicates +
+            ' repetida(s) omitida(s).',
+            'ok'
+          );
+
+          state.photos = [];
+
+          $('photos').value = '';
+
+          renderPhotos();
+
+        } catch (error) {
+          $('photoProgressDetail')
+            .textContent =
+            'Se detuvo en ' +
+            completed +
+            ' de ' +
+            total +
+            '. Las fotografías ya completadas permanecen guardadas.';
+
+          showError(
+            getErrorMessage(error) +
+            ' Puedes volver a presionar “Subir solo fotografías” y las repetidas se omitirán.'
+          );
+
+        } finally {
+          $('photoSubmitButton')
+            .disabled =
+            false;
+
+          $('photos')
+            .disabled =
+            false;
+
+          $('clearPhotosButton')
+            .disabled =
+            false;
+        }
+      }
+    );
+
+  function updatePhotoProgress_(
+    completed,
+    total,
+    detail
+  ) {
+    const safeTotal =
+      Math.max(
+        1,
+        Number(total || 1)
+      );
+
+    const safeCompleted =
+      Math.max(
+        0,
+        Math.min(
+          Number(
+            completed ||
+            0
+          ),
+          safeTotal
+        )
+      );
+
+    const percent =
+      Math.round(
+        (
+          safeCompleted /
+          safeTotal
+        ) * 100
+      );
+
+    $('photoProgressCount')
+      .textContent =
+      safeCompleted +
+      ' / ' +
+      Number(total || 0);
+
+    $('photoProgressBar')
+      .style.width =
+      percent + '%';
+
+    $('photoProgressText')
+      .textContent =
+      percent +
+      '% completado';
+
+    $('photoProgressDetail')
+      .textContent =
+      String(
+        detail ||
+        ''
+      );
+  }
+
+  function createSubmissionId_() {
+    if (
+      window.crypto &&
+      crypto.randomUUID
+    ) {
+      return crypto.randomUUID();
+    }
+
+    return (
+      Date.now()
+        .toString(36) +
+      '-' +
+      Math.random()
+        .toString(36)
+        .slice(2)
+    );
+  }
+
+  function chunkPhotos_(
+    photos,
+    size
+  ) {
+    const batches = [];
+
+    for (
+      let index = 0;
+      index < photos.length;
+      index += size
+    ) {
+      batches.push(
+        photos.slice(
+          index,
+          index + size
+        )
+      );
+    }
+
+    return batches;
+  }
+
+  function postPayload_(payload) {
+    const form =
+      document.createElement(
+        'form'
+      );
+
+    form.method = 'POST';
+
+    form.action =
+      BACKEND_URL;
+
+    form.target =
+      'resultFrame';
+
+    form.enctype =
+      'application/x-www-form-urlencoded';
+
+    form.style.display =
+      'none';
+
+    const input =
+      document.createElement(
+        'textarea'
+      );
+
+    input.name =
+      'payload';
+
+    input.value =
+      JSON.stringify(payload);
+
+    form.appendChild(input);
+
+    document.body
+      .appendChild(form);
+
+    form.submit();
+
+    setTimeout(() => {
+      try {
+        form.remove();
+      } catch (_) {}
+    }, 5000);
+  }
+
+  function getPhotoOperationStatus_(
+    operationId
+  ) {
+    return new Promise(
+      (resolve, reject) => {
+        const callbackName =
+          '__photoOperation_' +
+          Date.now() +
+          '_' +
+          Math.random()
+            .toString(36)
+            .slice(2);
+
+        const script =
+          document.createElement(
+            'script'
+          );
+
+        const cleanup = () => {
+          try {
+            delete window[
+              callbackName
+            ];
+          } catch (_) {}
+
+          try {
+            script.remove();
+          } catch (_) {}
+        };
+
+        const timeout =
+          setTimeout(() => {
+            cleanup();
+
+            reject(
+              new Error(
+                'No se pudo consultar el estado de las fotografías.'
+              )
+            );
+          }, 15000);
+
+        window[callbackName] =
+          result => {
+            clearTimeout(
+              timeout
+            );
+
+            cleanup();
+
+            resolve(
+              result ||
+              {}
+            );
+          };
+
+        script.src =
+          BACKEND_URL +
+          '?page=photoop' +
+          '&operationId=' +
+          encodeURIComponent(
+            operationId
+          ) +
+          '&callback=' +
+          encodeURIComponent(
+            callbackName
+          ) +
+          '&t=' +
+          Date.now();
+
+        script.onerror = () => {
+          clearTimeout(
+            timeout
+          );
+
+          cleanup();
+
+          reject(
+            new Error(
+              'No se pudo consultar el estado de las fotografías.'
+            )
+          );
+        };
+
+        document
+          .head
+          .appendChild(
+            script
+          );
+      }
+    );
+  }
+
+  async function waitForPhotoOperation_(
+    operationId
+  ) {
+    let attempts = 0;
+
+    while (true) {
+      try {
+        const status =
+          await getPhotoOperationStatus_(
+            operationId
+          );
+
+        if (
+          status.state ===
+            'completed' ||
+          status.state ===
+            'error'
+        ) {
+          return status;
+        }
+
+      } catch (_) {}
+
+      attempts++;
+
+      if (
+        attempts % 5 ===
+        0
+      ) {
+        showStatus(
+          'Las fotografías siguen procesándose. No es necesario volver a presionar el botón; seguimos verificando el servidor.',
+          'busy'
+        );
+      }
+
+      await wait_(2000);
+    }
+  }
+
+  function getSubmissionStatus_(
+    submissionId
+  ) {
+    return new Promise(
+      (resolve, reject) => {
+        const callbackName =
+          '__bitacoraStatus_' +
+          Date.now() +
+          '_' +
+          Math.random()
+            .toString(36)
+            .slice(2);
+
+        const script =
+          document
+            .createElement(
+              'script'
+            );
+
+        const cleanup = () => {
+          try {
+            delete window[
+              callbackName
+            ];
+          } catch (_) {}
+
+          try {
+            script.remove();
+          } catch (_) {}
+        };
+
+        const timeout =
+          setTimeout(() => {
+            cleanup();
+
+            reject(
+              new Error(
+                'No se pudo consultar el estado del servidor.'
+              )
+            );
+          }, 15000);
+
+        window[callbackName] =
+          result => {
+            clearTimeout(
+              timeout
+            );
+
+            cleanup();
+
+            if (
+              !result ||
+              result.ok === false
+            ) {
+              reject(
+                new Error(
+                  result?.message ||
+                  'Estado de servidor inválido.'
+                )
+              );
+
+              return;
+            }
+
+            state.lastServerStatus =
+              result;
+
+            resolve(result);
+          };
+
+        script.src =
+          BACKEND_URL +
+          '?page=status' +
+          '&submissionId=' +
+          encodeURIComponent(
+            submissionId
+          ) +
+          '&callback=' +
+          encodeURIComponent(
+            callbackName
+          ) +
+          '&t=' +
+          Date.now();
+
+        script.onerror = () => {
+          clearTimeout(
+            timeout
+          );
+
+          cleanup();
+
+          reject(
+            new Error(
+              'No se pudo consultar el estado del servidor.'
+            )
+          );
+        };
+
+        document
+          .head
+          .appendChild(
+            script
+          );
+      }
+    );
+  }
+
+  async function waitForServer_(
+    submissionId,
+    predicate,
+    timeoutMs,
+    timeoutMessage
+  ) {
+    let attempts = 0;
+
+    while (true) {
+      try {
+        const status =
+          await getSubmissionStatus_(
+            submissionId
+          );
+
+        if (
+          predicate(status)
+        ) {
+          return status;
+        }
+
+      } catch (_) {}
+
+      attempts++;
+
+      if (
+        attempts % 15 ===
+        0
+      ) {
+        showStatus(
+          'El proceso continúa. No cierres la página; seguiremos esperando la confirmación del servidor.',
+          'busy'
+        );
+      }
+
+      await wait_(2000);
+    }
+  }
+
+  function wait_(
+    milliseconds
+  ) {
+    return new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          milliseconds
+        )
+    );
+  }
+
+  $('repairButton')
+    .addEventListener(
+      'click',
+      async () => {
+        const submissionId =
+          $('visitSelect').value ||
+          state.selectedVisitId ||
+          state.repairSubmissionId ||
+          state.activeSubmissionId;
+
+        if (!submissionId) {
+          showError(
+            'No hay una visita pendiente para reparar.'
+          );
+
+          return;
+        }
+
+        const accessCode =
+          $('accessCode')
+            .value
+            .trim();
+
+        if (!accessCode) {
+          showError(
+            'Ingresa el código de acceso para reparar la visita.'
+          );
+
+          return;
+        }
+
+        setBusy(true);
+
+        showStatus(
+          'Reparando fotografías pendientes en el documento…',
+          'busy'
+        );
+
+        try {
+          postPayload_({
+            action:'repair',
+            accessCode,
+            submissionId
+          });
+
+          const repairedStatus =
+            await waitForServer_(
+              submissionId,
+
+              status =>
+                status.exists &&
+                status.process &&
+                status
+                  .process
+                  .photosPendingDocument ===
+                0,
+
+              180000,
+
+              'La reparación todavía no confirmó la inserción de todas las fotografías.'
+            );
+
+          setBusy(false);
+
+          updateProcessSummary_(
+            repairedStatus
+          );
+
+          showStatus(
+            'Reparación completada. Las fotografías pendientes fueron incorporadas al documento.',
+            'ok'
+          );
+
+          $('repairButton')
+            .classList
+            .remove('show');
+
+        } catch (error) {
+          setBusy(false);
+
+          showError(
+            getErrorMessage(
+              error
+            )
+          );
+        }
+      }
+    );
+
+  function updateProcessSummary_(
+    serverStatus
+  ) {
+    if (
+      !serverStatus ||
+      !serverStatus.process
+    ) {
+      return;
+    }
+
+    const process =
+      serverStatus.process;
+
+    const summary =
+      $('processSummary');
+
+    const lines = [
+      (
+        process.audioSaved
+          ? '✓'
+          : '•'
+      ) +
+        ' Audio: ' +
+        (
+          process.audioSaved
+            ? 'guardado'
+            : 'pendiente'
+        ),
+
+      (
+        process.transcriptionCompleted
+          ? '✓'
+          : '•'
+      ) +
+        ' Transcripción: ' +
+        (
+          process.transcriptionCompleted
+            ? 'procesada'
+            : 'pendiente'
+        ),
+
+      (
+        process.documentGenerated
+          ? '✓'
+          : '•'
+      ) +
+        ' Documento mensual: ' +
+        (
+          process.documentGenerated
+            ? 'generado'
+            : 'pendiente'
+        ),
+
+      (
+        Number(
+          process.photosSaved ||
+          0
+        ) > 0
+          ? '✓'
+          : '•'
+      ) +
+        ' Fotografías respaldadas en Drive: ' +
+        Number(
+          process.photosSaved ||
+          0
+        ),
+
+      (
+        Number(
+          process.photosPendingDocument ||
+          0
+        ) === 0
+          ? '✓'
+          : '⚠'
+      ) +
+        ' Fotografías insertadas en documento: ' +
+        Number(
+          process.photosInserted ||
+          0
+        ) +
+        ' de ' +
+        Number(
+          process.photosSaved ||
+          0
+        )
+    ];
+
+    if (
+      Number(
+        process.photosPendingDocument ||
+        0
+      ) > 0
+    ) {
+      lines.push(
+        '⚠ Pendientes de insertar en documento: ' +
+        Number(
+          process.photosPendingDocument ||
+          0
+        )
+      );
+    }
+
+    summary.innerHTML =
+      lines
+        .map(
+          line =>
+            '<div>' +
+            escapeHtml(line) +
+            '</div>'
+        )
+        .join('');
+
+    summary
+      .classList
+      .add('show');
+
+    state.repairSubmissionId =
+      serverStatus.submissionId ||
+      '';
+
+    if (
+      process.repairAvailable
+    ) {
+      $('repairButton')
+        .classList
+        .add('show');
+
+    } else {
+      $('repairButton')
+        .classList
+        .remove('show');
+    }
+  }
+
+  function resetAfterSuccess() {
+    resetAudio();
+
+    state.photos = [];
+
+    state.activeSubmissionId =
+      '';
+
+    state.uploadedBatchIndexes =
+      new Set();
+
+    state.lastPhotoSignature =
+      '';
+
+    $('photos').value =
+      '';
+
+    $('note').value =
+      '';
+
+    renderPhotos();
+  }
 
   function setBusy(busy) {
-    $('submitButton').disabled = busy; $('recordButton').disabled = busy;
-    if (busy) showStatus('Procesando audio y creando la bitácora. Puede tardar uno o dos minutos…', 'busy');
+    $('recordButton').disabled =
+      busy;
+
+    $('fallbackButton').disabled =
+      busy;
+
+    $('photos').disabled =
+      busy;
+
+    $('project').disabled =
+      busy;
+
+    $('accessCode').disabled =
+      busy;
   }
+
   function updateTimer() {
-    const s = Math.floor((Date.now()-state.startedAt)/1000);
-    $('timer').textContent = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+    const seconds =
+      Math.floor(
+        (
+          Date.now() -
+          state.startedAt
+        ) / 1000
+      );
+
+    $('timer').textContent =
+      String(
+        Math.floor(
+          seconds / 60
+        )
+      ).padStart(
+        2,
+        '0'
+      ) +
+      ':' +
+      String(
+        seconds % 60
+      ).padStart(
+        2,
+        '0'
+      );
   }
-  function showStatus(message,type) { $('status').textContent=String(message||''); $('status').className='status '+type; }
-  function showError(error) { showStatus(error?.message || error || 'Ocurrió un error.','error'); }
-  function blobToDataUrl(blob) { return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsDataURL(blob); }); }
-  function compressImage(file,maxDimension,quality) {
-    return new Promise((resolve,reject)=>{ const img=new Image(); img.onload=()=>{ let {width,height}=img; const scale=Math.min(1,maxDimension/Math.max(width,height)); width=Math.round(width*scale); height=Math.round(height*scale); const c=document.createElement('canvas'); c.width=width;c.height=height;c.getContext('2d').drawImage(img,0,0,width,height); c.toBlob(b=>b?resolve(b):reject(new Error('No se pudo procesar una fotografía.')),'image/jpeg',quality); }; img.onerror=reject; img.src=URL.createObjectURL(file); });
+
+  function showStatus(
+    message,
+    type
+  ) {
+    $('status').textContent =
+      String(
+        message ||
+        ''
+      );
+
+    $('status').className =
+      'status ' +
+      type;
+  }
+
+  function showError(
+    error
+  ) {
+    showStatus(
+      getErrorMessage(
+        error
+      ),
+      'error'
+    );
+  }
+
+  function getErrorMessage(
+    error
+  ) {
+    return (
+      error?.message ||
+      error ||
+      'Ocurrió un error.'
+    );
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise(
+      (
+        resolve,
+        reject
+      ) => {
+        const reader =
+          new FileReader();
+
+        reader.onload =
+          () =>
+            resolve(
+              reader.result
+            );
+
+        reader.onerror =
+          () =>
+            reject(
+              new Error(
+                'No se pudo leer el archivo.'
+              )
+            );
+
+        reader.readAsDataURL(
+          blob
+        );
+      }
+    );
+  }
+
+  function compressImage(
+    file,
+    maxDimension,
+    quality
+  ) {
+    return new Promise(
+      (
+        resolve,
+        reject
+      ) => {
+        const image =
+          new Image();
+
+        const imageUrl =
+          URL.createObjectURL(
+            file
+          );
+
+        image.onload = () => {
+          try {
+            let width =
+              image.width;
+
+            let height =
+              image.height;
+
+            const scale =
+              Math.min(
+                1,
+                maxDimension /
+                Math.max(
+                  width,
+                  height
+                )
+              );
+
+            width =
+              Math.round(
+                width *
+                scale
+              );
+
+            height =
+              Math.round(
+                height *
+                scale
+              );
+
+            const canvas =
+              document
+                .createElement(
+                  'canvas'
+                );
+
+            canvas.width =
+              width;
+
+            canvas.height =
+              height;
+
+            canvas
+              .getContext('2d')
+              .drawImage(
+                image,
+                0,
+                0,
+                width,
+                height
+              );
+
+            canvas.toBlob(
+              blob => {
+                URL.revokeObjectURL(
+                  imageUrl
+                );
+
+                if (blob) {
+                  resolve(blob);
+                } else {
+                  reject(
+                    new Error(
+                      'No se pudo comprimir una fotografía.'
+                    )
+                  );
+                }
+              },
+
+              'image/jpeg',
+              quality
+            );
+
+          } catch (error) {
+            URL.revokeObjectURL(
+              imageUrl
+            );
+
+            reject(error);
+          }
+        };
+
+        image.onerror = () => {
+          URL.revokeObjectURL(
+            imageUrl
+          );
+
+          reject(
+            new Error(
+              'Una fotografía no pudo abrirse.'
+            )
+          );
+        };
+
+        image.src =
+          imageUrl;
+      }
+    );
+  }
+
+  function escapeHtml(
+    value
+  ) {
+    return String(
+      value ||
+      ''
+    ).replace(
+      /[&<>'"]/g,
+
+      character => ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        "'":'&#39;',
+        '"':'&quot;'
+      })[
+        character
+      ]
+    );
   }
 </script>
 </body>
