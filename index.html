@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V3.2.0</title>
+  <title>Reporte de supervisión · V3.2.0 VERIFICABLE</title>
 
   <style>
     :root {
@@ -343,7 +343,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 3.2.0</div>
+    <div class="hint">Versión 3.2.0 · VERIFICABLE</div>
 
     <p class="lead">
       Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
@@ -356,6 +356,10 @@
     <select id="project" required>
       <option value="">Cargando proyectos…</option>
     </select>
+
+    <button id="testConnectionButton" class="secondary" type="button">
+      Verificar envío a Apps Script (sin subir archivos)
+    </button>
 
     <div class="mode-title">
       MODO A · NUEVO REPORTE
@@ -507,7 +511,9 @@
     selectedVisitId:'',
     selectedVisitInfo:null,
     orphanPhotoCount:0,
-    currentVisits:[]
+    currentVisits:[],
+    diagnosticRequestId:'',
+    diagnosticTimer:null
   };
 
   const $ = id => document.getElementById(id);
@@ -941,8 +947,8 @@
       $('photoSubmitButton').disabled = false;
 
       showStatus(
-        '✓ Audio enviado. La transcripción y el documento siguen procesándose. Puedes subir las fotografías desde ahora.',
-        'ok'
+        'Solicitud enviada desde el navegador. Esperando confirmación de Apps Script; aún NO está generado el documento.',
+        'busy'
       );
 
       monitorDocumentInBackground_(
@@ -1000,7 +1006,10 @@
           .add('show');
       }
 
-    } catch (_) {}
+    } catch (error) {
+      $('submitButton').disabled = false;
+      showError('No se confirmó la creación del documento: ' + getErrorMessage(error));
+    }
   }
 
   $('loadVisitsButton').addEventListener(
@@ -2061,6 +2070,57 @@
     return batches;
   }
 
+  $('testConnectionButton').addEventListener('click', () => {
+    const code = $('accessCode').value.trim();
+    if (!code) return showError('Ingresa primero el código de acceso.');
+
+    const requestId = createSubmissionId_();
+    state.diagnosticRequestId = requestId;
+    $('testConnectionButton').disabled = true;
+    showStatus('Probando POST: esperando respuesta real de Apps Script...', 'busy');
+
+    postPayload_({ action:'diagnostic_ping', accessCode:code, requestId });
+    clearTimeout(state.diagnosticTimer);
+    state.diagnosticTimer = setTimeout(() => {
+      if (state.diagnosticRequestId !== requestId) return;
+      state.diagnosticRequestId = '';
+      $('testConnectionButton').disabled = false;
+      showError('No llegó la confirmación del POST. No se subió ningún archivo. Revisar implementación /exec y iframe de respuesta.');
+    }, 35000);
+  });
+
+  window.addEventListener('message', event => {
+    if (event.source !== $('resultFrame').contentWindow) return;
+    const data = event.data || {};
+    if (data.type !== 'bitacora-result') return;
+
+    if (data.action === 'diagnostic_ping') {
+      if (data.requestId !== state.diagnosticRequestId) return;
+      clearTimeout(state.diagnosticTimer);
+      state.diagnosticRequestId = '';
+      $('testConnectionButton').disabled = false;
+      if (data.ok === true && data.status === 'connected') {
+        showStatus('✓ POST CONFIRMADO: GitHub y Apps Script sí se comunican. No se modificó Drive.', 'ok');
+      } else {
+        showError('POST recibido pero rechazado: ' + (data.message || 'Error no identificado'));
+      }
+      return;
+    }
+
+    if (data.action && data.action !== 'start') return;
+    if (data.submissionId && data.submissionId !== state.activeSubmissionId) return;
+
+    if (data.ok === false) {
+      $('submitButton').disabled = false;
+      showError('Apps Script devolvió un error: ' + (data.message || 'Sin detalle'));
+      return;
+    }
+    if (data.ok === true && data.result && data.result.docUrl) {
+      $('submitButton').disabled = false;
+      showStatus('✓ Bitácora creada. Documento confirmado por el servidor.', 'ok');
+    }
+  });
+
   function postPayload_(payload) {
     const form =
       document.createElement(
@@ -2103,7 +2163,7 @@
       try {
         form.remove();
       } catch (_) {}
-    }, 5000);
+    }, 90000);
   }
 
   function getPhotoOperationStatus_(
@@ -2359,13 +2419,20 @@
             submissionId
           );
 
-        if (
-          predicate(status)
-        ) {
-          return status;
+        if (status && (status.status === 'error' || status.errorMessage)) {
+          throw new Error(status.errorMessage || 'El servidor reportó un fallo en la visita.');
         }
-
-      } catch (_) {}
+        if (predicate(status)) return status;
+        if (attempts >= 30 && !status.exists) {
+          throw new Error('El servidor no registró la sesión. Revisa el envío POST y la implementación de Apps Script.');
+        }
+      } catch (error) {
+        // No ocultar errores reales del servidor.
+        if (error && error.message && (
+          error.message.indexOf('El servidor no registró la sesión') >= 0 ||
+          (state.lastServerStatus && state.lastServerStatus.status === 'error')
+        )) throw error;
+      }
 
       attempts++;
 
