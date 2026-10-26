@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Reporte de supervisión · V3.2.0 DIAGNÓSTICO FINAL</title>
+  <title>Reporte de supervisión · V4.0 ESTABLE</title>
 
   <style>
     :root {
@@ -344,7 +344,7 @@
 <main>
   <section class="card">
     <h1>Reporte de supervisión</h1>
-    <div class="hint">Versión 3.2.0 · DIAGNÓSTICO FINAL</div>
+    <div class="hint">Versión 4.0 · ESTABLE</div>
 
     <p class="lead">
       Puedes crear un reporte nuevo con audio o usar únicamente el módulo de fotografías para una bitácora ya existente.
@@ -407,9 +407,28 @@
         </button>
       </div>
 
+      <div id="visitDateLong" class="date-long-preview"></div>
+
       <select id="visitSelect">
         <option value="">Busca una fecha y selecciona la bitácora</option>
       </select>
+
+      <div class="recovery-box">
+        <strong>Recuperar audio ya guardado</strong>
+        <p class="hint">
+          Si un envío anterior guardó el audio en Drive pero no creó el documento,
+          puedes recuperarlo sin volver a grabar.
+        </p>
+        <button id="loadAudiosButton" class="secondary" type="button">
+          Ver audios guardados de esta fecha
+        </button>
+        <select id="audioRecoverySelect">
+          <option value="">No se han consultado audios</option>
+        </select>
+        <button id="recoverAudioButton" class="repair" type="button">
+          Procesar audio seleccionado
+        </button>
+      </div>
 
       <div id="visitPhotoInfo" class="hint"></div>
 
@@ -506,7 +525,8 @@
     selectedVisitId:'',
     selectedVisitInfo:null,
     orphanPhotoCount:0,
-    currentVisits:[]
+    currentVisits:[],
+    pendingPosts:new Map()
   };
 
   const $ = id => document.getElementById(id);
@@ -535,6 +555,76 @@
 
   loadProjects();
   $('visitDate').value = new Date().toISOString().slice(0, 10);
+  updateVisitDateLong_();
+  $('visitDate').addEventListener('change', updateVisitDateLong_);
+
+
+  function formatDateLongClient_(isoDate) {
+    const match = String(isoDate || '').match(
+      /^(\d{4})-(\d{2})-(\d{2})$/
+    );
+
+    if (!match) {
+      return '';
+    }
+
+    const date = new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      12,
+      0,
+      0
+    );
+
+    const weekdays = [
+      'Domingo',
+      'Lunes',
+      'Martes',
+      'Miércoles',
+      'Jueves',
+      'Viernes',
+      'Sábado'
+    ];
+
+    const months = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre'
+    ];
+
+    return (
+      weekdays[date.getDay()] +
+      ' ' +
+      date.getDate() +
+      ' de ' +
+      months[date.getMonth()] +
+      ' de ' +
+      date.getFullYear()
+    );
+  }
+
+
+  function updateVisitDateLong_() {
+    const target = $('visitDateLong');
+
+    if (target) {
+      target.textContent =
+        formatDateLongClient_(
+          $('visitDate').value
+        );
+    }
+  }
+
 
   function loadProjects() {
     const script = document.createElement('script');
@@ -814,108 +904,136 @@
 
 
   $('submitButton').addEventListener('click', async () => {
-    const accessCode = $('accessCode').value.trim();
-    const project = $('project').value.trim();
+    const accessCode =
+      $('accessCode').value.trim();
 
-    if (!accessCode) return showError('Ingresa el código de acceso.');
-    if (!project) return showError('Selecciona el proyecto.');
-    if (!state.audioBlob && !state.activeSubmissionId) return showError('Graba o adjunta un audio.');
+    const project =
+      $('project').value.trim();
+
+    if (!accessCode) {
+      return showError(
+        'Ingresa el código de acceso.'
+      );
+    }
+
+    if (!project) {
+      return showError(
+        'Selecciona el proyecto.'
+      );
+    }
+
+    if (!state.audioBlob) {
+      return showError(
+        'Graba o adjunta un audio.'
+      );
+    }
 
     $('submitButton').disabled = true;
+    $('photoSubmitButton').disabled = true;
+
+    state.activeSubmissionId =
+      createSubmissionId_();
+
+    state.selectedVisitId =
+      state.activeSubmissionId;
+
+    $('visitSelect').innerHTML =
+      '<option value="' +
+      escapeHtml(state.activeSubmissionId) +
+      '">Visita actual · procesando</option>';
+
+    $('visitSelect').value =
+      state.activeSubmissionId;
+
+    showStatus(
+      'Procesando audio, transcripción y documento. ' +
+      'No cierres la página hasta recibir confirmación.',
+      'busy'
+    );
 
     try {
-      if (!state.activeSubmissionId) {
-        state.activeSubmissionId = createSubmissionId_();
-      }
+      const response = await sendPost_(
+        {
+          action:'start',
+          accessCode:accessCode,
+          submissionId:state.activeSubmissionId,
+          project:project,
+          note:$('note').value.trim(),
+          expectedPhotoCount:state.photos.length,
+          audio:{
+            dataUrl:
+              await blobToDataUrl(
+                state.audioBlob
+              ),
+            mimeType:
+              state.audioMime ||
+              state.audioBlob.type ||
+              'audio/webm'
+          }
+        },
+        330000
+      );
 
-      state.selectedVisitId = state.activeSubmissionId;
+      const result =
+        response.result || {};
+
+      state.selectedVisitInfo = {
+        submissionId:
+          state.activeSubmissionId,
+        visitNumber:
+          result.visitNumber || '',
+        reportNumber:
+          result.reportNumber || '',
+        docUrl:
+          result.docUrl || '',
+        date:
+          result.visitDate || '',
+        photosSaved:0,
+        photosInserted:0,
+        orphanPhotoCount:0
+      };
+
       $('visitSelect').innerHTML =
-        '<option value="' + escapeHtml(state.activeSubmissionId) + '">' +
-        'Visita actual · procesando audio/documento' +
+        '<option value="' +
+        escapeHtml(
+          state.activeSubmissionId
+        ) +
+        '">' +
+        escapeHtml(
+          'Visita ' +
+          (result.visitNumber || '') +
+          ' · Documento generado'
+        ) +
         '</option>';
-      $('visitSelect').value = state.activeSubmissionId;
+
+      $('visitSelect').value =
+        state.activeSubmissionId;
 
       showStatus(
-        'Paso 1 iniciado: audio enviado para transcripción y generación del documento. Ya puedes continuar con las fotografías.',
-        'busy'
-      );
-
-      postPayload_({
-        action:'start',
-        accessCode,
-        submissionId:state.activeSubmissionId,
-        project,
-        note:$('note').value.trim(),
-        expectedPhotoCount:state.photos.length,
-        audio:{
-          dataUrl:await blobToDataUrl(state.audioBlob),
-          mimeType:state.audioMime || state.audioBlob.type || 'audio/webm'
-        }
-      });
-
-      $('photoSubmitButton').disabled = false;
-
-      showStatus(
-        '✓ Audio enviado. La transcripción y el documento siguen procesándose. Puedes subir las fotografías desde ahora.',
+        '✓ Documento generado correctamente. ' +
+        (
+          state.photos.length
+            ? 'Ahora puedes subir las fotografías seleccionadas.'
+            : 'La visita quedó guardada.'
+        ),
         'ok'
       );
 
-      monitorDocumentInBackground_(state.activeSubmissionId);
+      $('photoSubmitButton').disabled =
+        state.photos.length === 0;
+
+      $('submitButton').disabled = false;
 
     } catch (error) {
       $('submitButton').disabled = false;
-      showError(getErrorMessage(error));
-    }
-  });
-
-  async function monitorDocumentInBackground_(submissionId) {
-    try {
-      const status = await waitForServer_(
-        submissionId,
-        result =>
-          result.exists &&
-          (
-            (result.process && result.process.documentGenerated === true) ||
-            (result.result && result.result.docUrl)
-          ),
-        5 * 60 * 1000,
-        'El documento no fue confirmado dentro de 5 minutos.'
-      );
-
-      updateProcessSummary_(status);
-
-      const process = status.process || {};
-
-      showStatus(
-        '✓ Documento generado correctamente.',
-        'ok'
-      );
-
-      $('submitButton').disabled = false;
-
-      if (
-        Number(process.photosPendingDocument || 0) > 0 &&
-        process.repairAvailable
-      ) {
-        $('repairButton').classList.add('show');
-      }
-
-    } catch (error) {
-      $('submitButton').disabled = false;
+      $('photoSubmitButton').disabled = true;
 
       showError(
-        'Error al generar el documento: ' +
+        'No se pudo generar el documento: ' +
         getErrorMessage(error)
       );
-
-      try {
-        const latestStatus =
-          await getSubmissionStatus_(submissionId);
-
-        updateProcessSummary_(latestStatus);
-      } catch (_) {}
     }
-  }
+  });
 
 
 
@@ -989,7 +1107,8 @@
       $('visitSelect').innerHTML = visits.map(visit => {
         const label =
           (visit.projectName ? visit.projectName + ' · ' : '') +
-          'Visita ' +
+          formatDateLongClient_(visit.date || date) +
+          ' · Visita ' +
           (visit.visitNumber || 'sin número') +
           ' · Fotos en documento: ' +
           Number(visit.photosInserted || 0) +
@@ -1208,11 +1327,14 @@
     );
 
     try {
-      postPayload_({
-        action:'recover_date_photos',
-        accessCode,
-        submissionId
-      });
+      await sendPost_(
+        {
+          action:'recover_date_photos',
+          accessCode,
+          submissionId
+        },
+        180000
+      );
 
       const previousOrphanCount = Number(
         state.orphanPhotoCount || 0
@@ -1312,30 +1434,32 @@
           'Subiendo fotografía ' + (index + 1) + ' de ' + total + '…'
         );
 
-        postPayload_({
-          action:'photo_single',
-          accessCode,
-          submissionId:targetSubmissionId,
-          operationId,
-          photoIndex:index + 1,
-          image:{
-            dataUrl:await blobToDataUrl(item.blob),
-            mimeType:item.blob.type || 'image/jpeg',
-            caption:'',
-            hash:item.hash || ''
-          }
-        });
-
-        const operationStatus = await waitForPhotoOperation_(operationId);
-
-        if (operationStatus.state === 'error') {
-          throw new Error(
-            operationStatus.message ||
-            'Falló la fotografía ' + (index + 1) + '.'
+        const operationResponse =
+          await sendPost_(
+            {
+              action:'photo_single',
+              accessCode,
+              submissionId:targetSubmissionId,
+              operationId,
+              photoIndex:index + 1,
+              image:{
+                dataUrl:
+                  await blobToDataUrl(
+                    item.blob
+                  ),
+                mimeType:
+                  item.blob.type ||
+                  'image/jpeg',
+                caption:'',
+                hash:item.hash || ''
+              }
+            },
+            120000
           );
-        }
 
-        const result = operationStatus.result || {};
+        const result =
+          operationResponse.result ||
+          operationResponse;
 
         if (result.duplicate) {
           duplicates++;
@@ -1378,24 +1502,24 @@
         $('photoProgressDetail').textContent =
           'Todas las fotos ya están en Drive. Incorporando las pendientes al documento…';
 
-        postPayload_({
-          action:'repair',
-          accessCode,
-          submissionId:targetSubmissionId
-        });
-
-        status = await waitForServer_(
-          targetSubmissionId,
-          current =>
-            current.exists &&
-            current.process &&
-            Number(current.process.photosPendingDocument || 0) === 0,
-          0,
-          ''
+        await sendPost_(
+          {
+            action:'repair',
+            accessCode,
+            submissionId:targetSubmissionId
+          },
+          180000
         );
 
+        status =
+          await getSubmissionStatus_(
+            targetSubmissionId
+          );
+
         updateProcessSummary_(status);
-        await refreshSelectedVisitInfo_(targetSubmissionId);
+        await refreshSelectedVisitInfo_(
+          targetSubmissionId
+        );
       }
 
       const finalProcess = (status && status.process) || {};
@@ -1479,74 +1603,136 @@
   }
 
 
-  function postPayload_(payload) {
-    const encodedBody =
-      'payload=' +
-      encodeURIComponent(
-        JSON.stringify(payload)
+  function sendPost_(payload, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const requestId =
+        createSubmissionId_();
+
+      payload = Object.assign(
+        {},
+        payload,
+        { requestId:requestId }
       );
 
-    // Método principal:
-    // POST directo sin esperar/leer la respuesta.
-    // El estado se sigue consultando después por doGet.
-    try {
-      fetch(BACKEND_URL, {
-        method:'POST',
-        mode:'no-cors',
-        credentials:'omit',
-        redirect:'follow',
-        headers:{
-          'Content-Type':
-            'application/x-www-form-urlencoded;charset=UTF-8'
-        },
-        body:encodedBody,
-        keepalive:false
-      }).catch(() => {
-        postPayloadFallback_(payload);
-      });
+      const timeout =
+        setTimeout(() => {
+          state.pendingPosts.delete(
+            requestId
+          );
 
-      return;
+          reject(
+            new Error(
+              'El servidor no respondió dentro del tiempo esperado.'
+            )
+          );
+        }, Number(timeoutMs || 180000));
 
-    } catch (_) {
-      postPayloadFallback_(payload);
+      state.pendingPosts.set(
+        requestId,
+        {
+          resolve:resolve,
+          reject:reject,
+          timeout:timeout
+        }
+      );
+
+      const form =
+        document.createElement('form');
+
+      form.method = 'POST';
+      form.action = BACKEND_URL;
+      form.target = 'resultFrame';
+      form.enctype =
+        'application/x-www-form-urlencoded';
+      form.style.display = 'none';
+
+      const input =
+        document.createElement('textarea');
+
+      input.name = 'payload';
+      input.value =
+        JSON.stringify(payload);
+
+      form.appendChild(input);
+      document.body.appendChild(form);
+
+      try {
+        form.submit();
+      } catch (error) {
+        clearTimeout(timeout);
+        state.pendingPosts.delete(
+          requestId
+        );
+        form.remove();
+        reject(error);
+        return;
+      }
+
+      setTimeout(() => {
+        try {
+          form.remove();
+        } catch (_) {}
+      }, 15000);
+    });
+  }
+
+
+  function postPayload_(payload) {
+    return sendPost_(payload, 180000);
+  }
+
+
+  window.addEventListener(
+    'message',
+    event => {
+      const data = event.data || {};
+
+      if (
+        data.type !==
+        'bitacora-result'
+      ) {
+        return;
+      }
+
+      const requestId =
+        String(
+          data.requestId || ''
+        );
+
+      if (!requestId) {
+        return;
+      }
+
+      const pending =
+        state.pendingPosts.get(
+          requestId
+        );
+
+      if (!pending) {
+        return;
+      }
+
+      clearTimeout(
+        pending.timeout
+      );
+
+      state.pendingPosts.delete(
+        requestId
+      );
+
+      if (data.ok === false) {
+        pending.reject(
+          new Error(
+            data.message ||
+            'El servidor informó un error.'
+          )
+        );
+        return;
+      }
+
+      pending.resolve(data);
     }
-  }
-
-
-  function postPayloadFallback_(payload) {
-    const frameName =
-      '__bitacoraPost_' +
-      Date.now() +
-      '_' +
-      Math.random().toString(36).slice(2);
-
-    const frame = document.createElement('iframe');
-    frame.name = frameName;
-    frame.style.display = 'none';
-
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = BACKEND_URL;
-    form.target = frameName;
-    form.enctype =
-      'application/x-www-form-urlencoded';
-    form.style.display = 'none';
-
-    const input = document.createElement('textarea');
-    input.name = 'payload';
-    input.value = JSON.stringify(payload);
-
-    form.appendChild(input);
-    document.body.appendChild(frame);
-    document.body.appendChild(form);
-
-    form.submit();
-
-    setTimeout(() => {
-      try { form.remove(); } catch (_) {}
-      try { frame.remove(); } catch (_) {}
-    }, 60000);
-  }
+  );
 
 
 
@@ -1680,44 +1866,31 @@
     timeoutMs,
     timeoutMessage
   ) {
-    const startedAt = Date.now();
+    let attempts = 0;
 
     while (true) {
-      const status = await getSubmissionStatus_(
-        submissionId
-      );
+      try {
+        const status = await getSubmissionStatus_(submissionId);
 
-      if (
-        status &&
-        (
-          status.status === 'error' ||
-          status.errorMessage
-        )
-      ) {
-        throw new Error(
-          status.errorMessage ||
-          'El servidor informó un error al procesar la visita.'
-        );
+        if (predicate(status)) {
+          return status;
+        }
+      } catch (_) {
+        // Reintenta indefinidamente: los problemas de red no cancelan el proceso.
       }
 
-      if (predicate(status)) {
-        return status;
-      }
+      attempts++;
 
-      if (
-        timeoutMs &&
-        Date.now() - startedAt >= timeoutMs
-      ) {
-        throw new Error(
-          timeoutMessage ||
-          'El servidor no confirmó el proceso.'
+      if (attempts % 15 === 0) {
+        showStatus(
+          'El proceso continúa. No cierres la página; seguiremos esperando la confirmación del servidor.',
+          'busy'
         );
       }
 
       await wait_(2000);
     }
   }
-
 
   function wait_(milliseconds) {
     return new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -1749,21 +1922,19 @@
     );
 
     try {
-      postPayload_({
-        action:'repair',
-        accessCode,
-        submissionId
-      });
-
-      const repairedStatus = await waitForServer_(
-        submissionId,
-        status =>
-          status.exists &&
-          status.process &&
-          status.process.photosPendingDocument === 0,
-        180000,
-        'La reparación todavía no confirmó la inserción de todas las fotografías.'
+      await sendPost_(
+        {
+          action:'repair',
+          accessCode,
+          submissionId
+        },
+        180000
       );
+
+      const repairedStatus =
+        await getSubmissionStatus_(
+          submissionId
+        );
 
       setBusy(false);
       updateProcessSummary_(repairedStatus);
@@ -1780,6 +1951,292 @@
       showError(getErrorMessage(error));
     }
   });
+
+
+  $('loadAudiosButton').addEventListener(
+    'click',
+    async () => {
+      const accessCode =
+        $('accessCode').value.trim();
+
+      const project =
+        $('project').value.trim();
+
+      const date =
+        $('visitDate').value;
+
+      if (!accessCode) {
+        return showError(
+          'Ingresa el código de acceso.'
+        );
+      }
+
+      if (!project) {
+        return showError(
+          'Selecciona el proyecto.'
+        );
+      }
+
+      if (!date) {
+        return showError(
+          'Selecciona una fecha.'
+        );
+      }
+
+      showStatus(
+        'Buscando audios guardados…',
+        'busy'
+      );
+
+      try {
+        const result =
+          await loadAudios_(
+            accessCode,
+            project,
+            date
+          );
+
+        const audios =
+          Array.isArray(result.audios)
+            ? result.audios
+            : [];
+
+        if (!audios.length) {
+          $('audioRecoverySelect').innerHTML =
+            '<option value="">No hay audios guardados para esa fecha</option>';
+
+          $('recoverAudioButton')
+            .classList.remove('show');
+
+          return showStatus(
+            'No se encontraron audios guardados para esa fecha.',
+            'ok'
+          );
+        }
+
+        $('audioRecoverySelect').innerHTML =
+          audios.map(audio => {
+            const label =
+              audio.name +
+              (
+                audio.linked
+                  ? ' · ya asociado'
+                  : ' · disponible para recuperar'
+              );
+
+            return (
+              '<option value="' +
+              escapeHtml(audio.fileId) +
+              '"' +
+              (audio.linked ? ' disabled' : '') +
+              '>' +
+              escapeHtml(label) +
+              '</option>'
+            );
+          }).join('');
+
+        const available =
+          audios.filter(
+            audio => !audio.linked
+          );
+
+        if (available.length) {
+          $('audioRecoverySelect').value =
+            available[0].fileId;
+
+          $('recoverAudioButton')
+            .classList.add('show');
+
+          showStatus(
+            'Audios encontrados. Selecciona el que deseas recuperar.',
+            'ok'
+          );
+
+        } else {
+          $('recoverAudioButton')
+            .classList.remove('show');
+
+          showStatus(
+            'Todos los audios encontrados ya están asociados a una bitácora.',
+            'ok'
+          );
+        }
+
+      } catch (error) {
+        showError(
+          'No se pudieron consultar los audios: ' +
+          getErrorMessage(error)
+        );
+      }
+    }
+  );
+
+
+  $('recoverAudioButton').addEventListener(
+    'click',
+    async () => {
+      const accessCode =
+        $('accessCode').value.trim();
+
+      const project =
+        $('project').value.trim();
+
+      const fileId =
+        $('audioRecoverySelect').value;
+
+      if (!fileId) {
+        return showError(
+          'Selecciona un audio para recuperar.'
+        );
+      }
+
+      $('recoverAudioButton').disabled = true;
+
+      showStatus(
+        'Recuperando audio ya guardado y generando documento…',
+        'busy'
+      );
+
+      try {
+        const response =
+          await sendPost_(
+            {
+              action:'recover_audio',
+              accessCode,
+              project,
+              fileId,
+              note:$('note').value.trim()
+            },
+            330000
+          );
+
+        const result =
+          response.result || {};
+
+        state.activeSubmissionId =
+          response.submissionId ||
+          state.activeSubmissionId;
+
+        showStatus(
+          response.alreadyProcessed
+            ? 'Ese audio ya estaba asociado a una bitácora.'
+            : '✓ Audio recuperado y documento generado correctamente.',
+          'ok'
+        );
+
+      } catch (error) {
+        showError(
+          'No se pudo recuperar el audio: ' +
+          getErrorMessage(error)
+        );
+
+      } finally {
+        $('recoverAudioButton').disabled = false;
+      }
+    }
+  );
+
+
+  function loadAudios_(
+    accessCode,
+    project,
+    date
+  ) {
+    return new Promise(
+      (resolve, reject) => {
+        const callbackName =
+          '__audios_' +
+          Date.now() +
+          '_' +
+          Math.random()
+            .toString(36)
+            .slice(2);
+
+        const script =
+          document.createElement(
+            'script'
+          );
+
+        const cleanup = () => {
+          try {
+            delete window[
+              callbackName
+            ];
+          } catch (_) {}
+
+          try {
+            script.remove();
+          } catch (_) {}
+        };
+
+        const timeout =
+          setTimeout(() => {
+            cleanup();
+            reject(
+              new Error(
+                'No se pudo consultar la lista de audios.'
+              )
+            );
+          }, 20000);
+
+        window[callbackName] =
+          result => {
+            clearTimeout(timeout);
+            cleanup();
+
+            if (
+              !result ||
+              result.ok === false
+            ) {
+              reject(
+                new Error(
+                  result?.message ||
+                  'No se pudieron cargar los audios.'
+                )
+              );
+              return;
+            }
+
+            resolve(result);
+          };
+
+        script.src =
+          BACKEND_URL +
+          '?page=audios' +
+          '&accessCode=' +
+          encodeURIComponent(
+            accessCode
+          ) +
+          '&project=' +
+          encodeURIComponent(
+            project
+          ) +
+          '&date=' +
+          encodeURIComponent(
+            date
+          ) +
+          '&callback=' +
+          encodeURIComponent(
+            callbackName
+          ) +
+          '&t=' +
+          Date.now();
+
+        script.onerror = () => {
+          clearTimeout(timeout);
+          cleanup();
+          reject(
+            new Error(
+              'No se pudo conectar con el servidor.'
+            )
+          );
+        };
+
+        document.head
+          .appendChild(script);
+      }
+    );
+  }
 
 
   function updateProcessSummary_(serverStatus) {
